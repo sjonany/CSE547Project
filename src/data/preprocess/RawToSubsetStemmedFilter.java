@@ -39,9 +39,10 @@ public class RawToSubsetStemmedFilter {
 			String[] toks = line.split("\t");
 			String verb = stem(toks[1]);
 			String obj = stem(toks[2]);
+			int freq = Integer.parseInt(toks[3]);
 			
-			StatUtil.addToTally(verbToCount, verb, 1);
-			StatUtil.addToTally(objToCount, obj, 1);
+			StatUtil.addToTally(verbToCount, verb, freq);
+			StatUtil.addToTally(objToCount, obj, freq);
 			
 			line = in.readLine();
 			totalInputRow++;
