@@ -14,10 +14,10 @@ import java.util.TreeMap;
 import org.apache.commons.lang3.tuple.Pair;
 
 import util.StatUtil;
-import util.Stemmer;
 
 /**
  * Convert a dataset of the form "<verb> <object> <freq:int>"
+ * Each word has already been porter-stemmed
  * ---- but there might be multiple rows with same VO , but their freqs aggregated
  * to rows of "<verb> <object> <freq:int> <isPositive :[0/1]>"
  * This time, the VO pairs are aggregated.
@@ -25,7 +25,7 @@ import util.Stemmer;
 public class PositiveNegativeDatasetCreator {
 	public static void main(String[] args) throws Exception {
 		if(args.length != 4) {
-			System.err.println("Usage: <input file> <output file> <Tau: double - MI > tau = pos> <K: int - num negatives for each positive>");
+			System.err.println("Usage: <input file> <output file> <Tau: double - (MI > tau) -> pos> <K: int - num negatives for each positive>");
 			return;
 		}
 		String inputFile = args[0];
@@ -45,8 +45,8 @@ public class PositiveNegativeDatasetCreator {
 		Map<Pair<String, String>, Integer> voToCount = new HashMap<Pair<String, String>, Integer>();
 		while(line != null) {
 			String[] toks = line.split("\t");
-			String verb = Stemmer.getInstance().getStemmedForm(toks[0]);
-			String obj = Stemmer.getInstance().getStemmedForm(toks[1]);
+			String verb = toks[0];
+			String obj = toks[1];
 			int freq = Integer.parseInt(toks[2]);
 			
 			StatUtil.addToTally(voToCount, Pair.of(verb, obj), freq);
