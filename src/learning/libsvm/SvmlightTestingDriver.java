@@ -61,6 +61,11 @@ public class SvmlightTestingDriver {
 	    
 	    int numCorrect = 0;
 	    int lineCount = 0;
+	    
+	    int tp = 0;
+	    int fp = 0;
+	    int fn = 0;
+	    int tn = 0;
 	    while(line != null) {
 	    	String[] toks = line.split("\t");
 	    	String verb = toks[0];
@@ -81,6 +86,20 @@ public class SvmlightTestingDriver {
 				numCorrect++;
 			}
 			
+			if(isPositive) {
+				if(prediction > 0) {
+					tp++;
+				} else {
+					fn++;
+				}
+			} else {
+				if(prediction > 0) {
+					fp++;
+				} else {
+					tn++;
+				}
+			}
+			
 	    	line = in.readLine();
 	    	lineCount++;
 	    	if(lineCount % 100 == 0) {
@@ -91,5 +110,9 @@ public class SvmlightTestingDriver {
 	    in.close();
 		System.out.printf("Processed %d, acc = %d/%d = %.2f\n", lineCount, 
 				numCorrect, lineCount, 1.0  * numCorrect / lineCount);
+		System.out.println("TP = " + tp);
+		System.out.println("FP = " + fp);
+		System.out.println("FN = " + fn);
+		System.out.println("TN = " + tn);
 	}
 }

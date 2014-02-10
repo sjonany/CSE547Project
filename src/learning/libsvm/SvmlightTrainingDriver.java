@@ -50,7 +50,9 @@ public class SvmlightTrainingDriver {
 	    
 	    TrainingParameters trainParam = new TrainingParameters();
 	    // Switch on some debugging output
+	    // http://infolab.stanford.edu/~theobald/svmlight/doc/jnisvmlight/LearnParam.html
 	    trainParam.getLearningParameters().verbosity = 1;
+	    trainParam.getLearningParameters().svm_costratio = 2.0;
 	   
     	// For each verb, we train a single model
     	// Each such iteration requires going through the entire dataset
