@@ -81,7 +81,8 @@ public class PositiveNegativeDatasetCreator {
 		int countPositive = 0;
 		int countNegative = 0;
 		
-		
+		// Cache negative noun obj;s for frequence
+		Map<Integer, List<String>> freqToNegatives = new HashMap<Integer, List<String>>();
 		for(Entry<Pair<String, String>, Integer> entry : voToCount.entrySet()) {
 			String verb = entry.getKey().getLeft();
 			String obj = entry.getKey().getRight();
@@ -97,38 +98,48 @@ public class PositiveNegativeDatasetCreator {
 				out.println(verb + "\t" + obj + "\t" + freq + "\t" + 1);
 				countPositive++;
 				
-				// create negative instances
-				int numNegativeCreated = 0;
 				
 				int key = objToCount.get(obj);
 				int listIndex = 0;
 				
-				while(numNegativeCreated < K) {
-					// pre: guy at key + list index is a valid element & i haven't looked at it
-					List<String> lst = freqToObjs.get(key);
-					String possibleNPrime = lst.get(listIndex);
-					
-					if(!voToCount.containsKey(Pair.of(verb, possibleNPrime))) {
-						// found a good negative
-						numNegativeCreated++;
-						countNegative++;
-						out.println(verb + "\t" + possibleNPrime + "\t" + 0 + "\t" + 0);
-					}
-					
-					if(listIndex + 1 < lst.size()) {
-						listIndex++;
-					} else {
-						// time to search for next closest freq
-						SortedMap<Integer, List<String>> view = freqToObjs.tailMap(key+1);
-						if(view.size() == 0) {
-							// no more nouns to look at. stop.
-							break;
+				// create negative instances
+				List<String> negExamples = freqToNegatives.get(key);
+				if(negExamples == null) {
+					negExamples = new ArrayList<String>();
+					freqToNegatives.put(key, negExamples);
+					// create negative instances
+					int numNegativeCreated = 0;
+					while(numNegativeCreated < K) {
+						// pre: guy at key + list index is a valid element & i haven't looked at it
+						List<String> lst = freqToObjs.get(key);
+						String possibleNPrime = lst.get(listIndex);
+						
+						if(!voToCount.containsKey(Pair.of(verb, possibleNPrime))) {
+							// found a good negative
+							numNegativeCreated++;
+							negExamples.add(possibleNPrime);
+						}
+						
+						if(listIndex + 1 < lst.size()) {
+							listIndex++;
 						} else {
-							key = view.firstKey();
-							listIndex = 0;
+							// time to search for next closest freq
+							SortedMap<Integer, List<String>> view = freqToObjs.tailMap(key+1);
+							if(view.size() == 0) {
+								// no more nouns to look at. stop.
+								break;
+							} else {
+								key = view.firstKey();
+								listIndex = 0;
+							}
 						}
 					}
 				}
+				
+				for(String neg : negExamples) {
+					countNegative++;
+					out.println(verb + "\t" + neg + "\t" + 0 + "\t" + 0);
+				}	
 			}
 		}
 		System.out.printf("Num positive : %d, Num negative : %d\n", countPositive, countNegative);
