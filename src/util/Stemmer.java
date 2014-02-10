@@ -51,7 +51,24 @@ public class Stemmer
                j, k;
    private static final int INC = 50;
                      /* unit of size whereby b is increased */
-   public Stemmer()
+   
+   private static Stemmer instance = null;
+   public static Stemmer getInstance() {
+	   if(instance == null) {
+		   instance = new Stemmer();
+	   }
+	   return instance;
+   }
+   
+   public String getStemmedForm(String s) {
+		for(int i = 0; i < s.length(); i++) {
+			add(s.charAt(i));
+		}
+		stem();
+		return toString();
+   }
+   
+   private Stemmer()
    {  b = new char[INC];
       i = 0;
       i_end = 0;
@@ -354,7 +371,7 @@ public class Stemmer
     * from the input.  You can retrieve the result with
     * getResultLength()/getResultBuffer() or toString().
     */
-   public void stem()
+   private void stem()
    {  k = i - 1;
       if (k > 1) { step1(); step2(); step3(); step4(); step5(); step6(); }
       i_end = k+1; i = 0;

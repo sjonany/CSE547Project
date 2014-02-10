@@ -13,10 +13,9 @@ import util.Stemmer;
  * Input: SVO triple dataset http://rtw.ml.cmu.edu/resources/svo/
  * Output: A subset of VO rows of popular verbs and nouns, and they have
  * 	been porter-stemmed http://tartarus.org/martin/PorterStemmer/
+ * WARNING: there will be multiple VO rows with same stem, but unaggregated frequencies
  */
 public class RawToSubsetStemmedFilter {
-	private static final Stemmer stemmer = new Stemmer();
-	
 	public static void main(String[] args) throws Exception {
 		if(args.length != 4) {
 			System.err.println("Usage: <input file> <output file> <verb threshold: int> <obj threshold: int>");
@@ -37,8 +36,8 @@ public class RawToSubsetStemmedFilter {
 		
 		while(line != null) {
 			String[] toks = line.split("\t");
-			String verb = stem(toks[1]);
-			String obj = stem(toks[2]);
+			String verb = Stemmer.getInstance().getStemmedForm(toks[1]);
+			String obj = Stemmer.getInstance().getStemmedForm(toks[2]);
 			int freq = Integer.parseInt(toks[3]);
 			
 			StatUtil.addToTally(verbToCount, verb, freq);
@@ -59,13 +58,14 @@ public class RawToSubsetStemmedFilter {
 		int totalOutputRow = 0;
 		while(line != null) {
 			String[] toks = line.split("\t");
-			String verb = stem(toks[1]);
-			String obj = stem(toks[2]);
+			String verb = Stemmer.getInstance().getStemmedForm(toks[1]);
+			String obj = Stemmer.getInstance().getStemmedForm(toks[2]);
+			int freq = Integer.parseInt(toks[3]);
 			
 			int vcount = verbToCount.get(verb);
 			int ocount = objToCount.get(obj);
 			if(vcount >= verbThreshold && ocount >= objThreshold) {
-				out.println(verb + "\t" + obj);
+				out.println(verb + "\t" + obj + "\t" + freq);
 				totalOutputRow++;
 			}
 			
@@ -76,17 +76,5 @@ public class RawToSubsetStemmedFilter {
 		
 		in.close();
 		out.close();
-	}
-	
-	/**
-	 * @param s
-	 * @return stemmed version of 's'
-	 */
-	private static String stem(String s) {
-		for(int i = 0; i < s.length(); i++) {
-			stemmer.add(s.charAt(i));
-		}
-		stemmer.stem();
-		return stemmer.toString();
 	}
 }
