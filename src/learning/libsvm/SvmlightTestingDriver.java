@@ -43,11 +43,15 @@ public class SvmlightTestingDriver {
 	    System.out.println("Finished precomputation.");
 	    
 	    // Load all the models
-	    SVMLightModel[] models = new SVMLightModel[stats.getCountDistinctVerb()];
+	    System.out.println("Loading " + stats.getCountDistinctVerb() + " models...");
+	    SVMLightModel[] models = new SVMLightModel[stats.getCountDistinctVerb()+1];
 	    for(int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
 	    	models[verbId] = SVMLightModel.readSVMLightModelFromURL(
-	    			new URL(String.format(MODEL_FILENAME_TEMPLATE, modelDir, verbId)));
+	    			new URL(String.format("file:" + MODEL_FILENAME_TEMPLATE, modelDir, verbId)));
+	    	if(verbId % 100 == 0)
+	    		System.out.printf("Loaded %d out of %d\n", verbId, stats.getCountDistinctVerb());
 	    }
+	    System.out.println("Finished loading " + stats.getCountDistinctVerb() + " models...");
 	    
 	    BufferedReader in = new BufferedReader(new FileReader(testFile));
 	    
@@ -79,7 +83,7 @@ public class SvmlightTestingDriver {
 			
 	    	line = in.readLine();
 	    	lineCount++;
-	    	if(lineCount % 10000 == 0) {
+	    	if(lineCount % 100 == 0) {
 	    		System.out.printf("Processed %d, acc = %d/%d = %.2f\n", lineCount, 
 	    				numCorrect, lineCount, 1.0  * numCorrect / lineCount);
 	    	}

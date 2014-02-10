@@ -54,7 +54,8 @@ public class SvmlightTrainingDriver {
 	   
     	// For each verb, we train a single model
     	// Each such iteration requires going through the entire dataset
-	    for(int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
+	    for(int verbId = 748; verbId <= stats.getCountDistinctVerb(); verbId++) {
+	    	long curtime = System.currentTimeMillis();
 		    BufferedReader in = new BufferedReader(new FileReader(trainFile));
 		    
 		    // filter the dataset to rows relevant to this verb, then convert to feature vectors
@@ -79,7 +80,8 @@ public class SvmlightTrainingDriver {
 		    SVMLightModel model = new SVMLightInterface().trainModel(
 		    				features.toArray(new LabeledFeatureVector[0]), trainParam);
 		    model.writeModelToFile(String.format(MODEL_FILENAME_TEMPLATE, outputDir, verbId));
-	    	System.out.printf("%d out of %d models trained\n", verbId, stats.getCountDistinctVerb());
+		    long elapsedTime = System.currentTimeMillis() - curtime;
+	    	System.out.printf("%d out of %d models trained. Takes %d ms\n", verbId, stats.getCountDistinctVerb(), elapsedTime);
 	    }
 	}
 	
