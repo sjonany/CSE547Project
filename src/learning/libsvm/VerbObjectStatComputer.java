@@ -14,6 +14,7 @@ import util.StatUtil;
 
 /**
  * Precompute VO-related stats on the provided dataset
+ * TODO: Sigh, I realized this is wrong. We should compute these stats before we do the MI filter.
  */
 public class VerbObjectStatComputer {
 	private Map<String, Integer> verbCount;
