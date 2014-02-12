@@ -74,7 +74,11 @@ public class VerbObjectStatComputer {
 		String line = in.readLine();
 		SortedSet<String> verbs = new TreeSet<String>();
 		SortedSet<String> objs = new TreeSet<String>();
+		int lineCount = 0;
 		while(line != null) {
+			lineCount++;
+			if(lineCount % 100000 == 0) 
+				System.out.println(lineCount);
 			String[] toks = line.split("\t");
 			String verb = toks[0];
 			String obj = toks[1];

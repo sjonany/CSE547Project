@@ -10,4 +10,38 @@ public class StatUtil {
 			tally.put(key, tally.get(key) + val);
 		}
 	}
+	
+	public static class ClassificationPerformance {
+		// true/false pos/negs
+		public int tp;
+		public int fp;
+		public int fn;
+		public int tn;
+		
+		public ClassificationPerformance() {
+			tp = fp = fn = tn = 0;
+		}
+		
+		public double getAccuracy() {
+			return 1.0 * (tp + tn) / getDatasetSize();
+		}
+		
+		public double getPrecision() {
+			return 1.0 * tp / (tp + fp);
+		}
+		
+		public double getRecall() {
+			return 1.0 * tp / (tp + fn);
+		}
+		
+		public double getFscore() {
+			double p = getPrecision();
+			double r = getRecall();
+			return 2.0 * p * r / (p + r);
+		}
+		
+		public int getDatasetSize() {
+			return tp + fp + fn + tn;
+		}
+	}
 }

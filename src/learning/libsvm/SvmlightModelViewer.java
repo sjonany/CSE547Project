@@ -37,7 +37,6 @@ public class SvmlightModelViewer {
 		String line = mappingReader.readLine();
 		while(line != null) {
 			String[] toks = line.split("\t");
-			int id = Integer.parseInt(toks[0]);
 			String verb = toks[1];
 			idToVerb.add(verb);
 			line = mappingReader.readLine();
