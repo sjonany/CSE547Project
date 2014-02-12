@@ -2,12 +2,12 @@ package learning.libsvm;
 
 import java.io.PrintWriter;
 
-import util.SvmlightUtil;
-
 import jnisvmlight.LabeledFeatureVector;
 import jnisvmlight.SVMLightInterface;
 import jnisvmlight.SVMLightModel;
 import jnisvmlight.TrainingParameters;
+import util.SvmlightUtil;
+import util.StatUtil.ClassificationPerformance;
 
 /**
  * Driver for creating svmlight models trained on given dataset. Reference code
@@ -19,21 +19,23 @@ public class SvmlightTrainingDriver {
 	private static final String MODEL_FILENAME_TEMPLATE = "%s/model_%d.txt";
 
 	public static void main(String[] args) throws Exception {
-		if (args.length != 2) {
+		if (args.length != 4) {
 			System.err
-			    .println("Usage: <path to train> <output dir - must be a folder, will output all the models + mapping>");
+			    .println("Usage: <path to train> <path to validation> <path to stat> <output dir - must be a folder, will output all the models + mapping>");
 			return;
 		}
 
 		String trainFile = args[0];
-		String outputDir = args[1];
+		String validationFile = args[1];
+		String statFile = args[2];
+		String outputDir = args[3];
 		if (outputDir.endsWith("/")) {
 			outputDir = outputDir.substring(0, outputDir.length() - 1);
 		}
 
 		VerbObjectStatComputer stats = new VerbObjectStatComputer();
 		System.out.println("Precomputing stats from train file...");
-		stats.load(trainFile);
+		stats.load(statFile);
 		System.out.println("Finished precomputation.");
 
 	  FeatureExtractor featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
@@ -48,23 +50,48 @@ public class SvmlightTrainingDriver {
 
 		// For each verb, we train a single model, then write the model to disk
 		// Each such iteration requires going through the entire dataset
+		double[] lambdas = {10, 100, 1000, 10000};
 		for (int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
 			long curtime = System.currentTimeMillis();
 			LabeledFeatureVector[] trainSet = SvmlightUtil.filterDatasetToVerb(trainFile, stats.mapIdToVerb(verbId), featureExtractor);
+	    LabeledFeatureVector[] validationSet = SvmlightUtil.filterDatasetToVerb(validationFile, stats.mapIdToVerb(verbId), featureExtractor); 
+			SVMLightModel[] models = new SVMLightModel[lambdas.length];
 			
-			TrainingParameters trainParam = new TrainingParameters();
-			// Switch on some debugging output
-			// http://infolab.stanford.edu/~theobald/svmlight/doc/jnisvmlight/LearnParam.html
-			trainParam.getLearningParameters().verbosity = 1;
-			// TODO: cross-validation for these params
-			trainParam.getLearningParameters().svm_costratio = 2.0;
-
-			SVMLightModel model = new SVMLightInterface().trainModel(trainSet, trainParam);
-			model.writeModelToFile(String.format(MODEL_FILENAME_TEMPLATE, outputDir,
-			    verbId));
+			int bestLambdaIndex = -1;
+			double maxF1 = Double.NEGATIVE_INFINITY;
+			// Pick the lambda that works best against the validation set
+			for(int lambdaIndex = 0; lambdaIndex < lambdas.length; lambdaIndex++) {
+				double lambda = lambdas[lambdaIndex];
+				
+				TrainingParameters trainParam = new TrainingParameters();
+				// Switch on some debugging output
+				// http://infolab.stanford.edu/~theobald/svmlight/doc/jnisvmlight/LearnParam.html
+				//trainParam.getLearningParameters().verbosity = 1;
+				// TODO: cross-validation for these params
+				trainParam.getLearningParameters().svm_costratio = 2.0;
+				trainParam.getLearningParameters().svm_c = lambda;
+			
+				SVMLightModel model = new SVMLightInterface().trainModel(trainSet, trainParam);
+				models[lambdaIndex] = model;
+		    ClassificationPerformance validationResult = SvmlightUtil.testModel(model, validationSet);
+				if(bestLambdaIndex == -1) {
+					bestLambdaIndex = lambdaIndex;
+					maxF1 = validationResult.getFscore();
+				} else {
+					double fscore = validationResult.getFscore();
+					if(!Double.isNaN(fscore) && fscore > maxF1) {
+						maxF1 = fscore;
+						bestLambdaIndex = lambdaIndex;
+					}
+				}
+				System.out.printf("Verb = %s, Lambda = %.6f, validation f1 = %.6f\n", stats.mapIdToVerb(verbId),
+				    lambdas[lambdaIndex], validationResult.getFscore());
+			}
 			long elapsedTime = System.currentTimeMillis() - curtime;
-			System.out.printf("%d out of %d models trained. Takes %d ms\n", verbId,
-			    stats.getCountDistinctVerb(), elapsedTime);
+			models[bestLambdaIndex].writeModelToFile(String.format(MODEL_FILENAME_TEMPLATE, outputDir,
+			    verbId));
+			System.out.printf("%d out of %d models trained. Takes %d ms. Best Lambda = %.6f, validation f1 = %.6f\n", verbId,
+			    stats.getCountDistinctVerb(), elapsedTime, lambdas[bestLambdaIndex], maxF1);
 		}
 	}
 }

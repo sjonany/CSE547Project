@@ -21,6 +21,7 @@ import util.StatUtil;
  * Also makes sure that we are not computing this statistics using any test data set.
  * So, TrainTestValidationCreator must have already been run first before this class.
  * 
+ * Each probability is 10^6 more than their original value. So to get the probability, divide back.
  * The output format is
  * <number of verbs>
  * verb1 [obj_i p(o_i|v_1)]* 
@@ -30,7 +31,8 @@ import util.StatUtil;
  * obj P(obj)
  */
 public class VerbNounProbabilityCreator {
-
+	/** Each probability is 10^9 more than their original value. So to get the probability, divide back. */
+	public static double PROB_SCALE = 1000000000;
 	public static void main(String[] args) throws Exception {
 		if(args.length != 3) {
 			System.err.println("Usage: <input file> <output file> <test file>");
@@ -117,7 +119,7 @@ public class VerbNounProbabilityCreator {
 				double pr_vn = 1.0 * freq / totalFreq;
 				double pr_v = 1.0 * verbToCount.get(verb) / totalFreq;
 				double pr_n_given_v = pr_vn / pr_v;
-				out.printf("%s\t%.6f\t", obj, pr_n_given_v);
+				out.printf("%s\t%d\t", obj, (int)(pr_n_given_v * PROB_SCALE));
 			}
 			out.println();
 		}
@@ -129,7 +131,7 @@ public class VerbNounProbabilityCreator {
 			String obj = entry.getKey();
 			int freq = entry.getValue();
 			double pr_n = 1.0 * freq / totalFreq;
-			out.printf("%s\t%.6f\n", obj, pr_n);
+			out.printf("%s\t%d\n", obj, (int)(pr_n * PROB_SCALE));
 		}
 		out.close();
 	}

@@ -9,18 +9,19 @@ import util.SvmlightUtil;
 
 public class SingleModelExperiment {
 	public static void main(String[] args) throws Exception { 
-		if(args.length != 3 ) {
-			System.err.println("<path to train> <path to test> <verb to train: string>");
+		if(args.length != 4 ) {
+			System.err.println("<path to train> <path to test> <path to stat> <verb to train: string>");
 			return;
 		}
 		
 		String trainFile = args[0];
 		String testFile = args[1];
-		String targetVerb = args[2];
+		String statFile = args[2];
+		String targetVerb = args[3];
 
 	  VerbObjectStatComputer stats = new VerbObjectStatComputer();
 	  System.out.println("Precomputing stats from train file...");
-	  stats.load(trainFile);
+	  stats.load(statFile);
 	  System.out.println("Finished precomputation.");
 	  
 	  FeatureExtractor featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
@@ -32,7 +33,7 @@ public class SingleModelExperiment {
     
 	  double[] lambdas = {0.1, 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000.0 ,1000000000.0};
 	  double[] costRatios = {1.0,1.5,2.0,5.0,10.0,50, 100};
-	  System.out.println("Lambda\ttrainPrecision\ttrainRecall\ttrainF1\ttrainAccuracy\ttestPrecision\ttestRecall\ttestF1\ttestAccuracy");
+	  System.out.println("Lambda\tCostRatio\ttrainPrecision\ttrainRecall\ttrainF1\ttrainAccuracy\ttestPrecision\ttestRecall\ttestF1\ttestAccuracy");
 		for(double lambda : lambdas) {
 			for(double costRatio : costRatios) {
 		    TrainingParameters trainParam = new TrainingParameters();

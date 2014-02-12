@@ -81,7 +81,7 @@ public class PositiveNegativeDatasetCreator {
 		int countPositive = 0;
 		int countNegative = 0;
 		
-		// Cache negative noun obj;s for frequence
+		// Cache negative noun obj's for frequency
 		Map<Integer, List<String>> freqToNegatives = new HashMap<Integer, List<String>>();
 		for(Entry<Pair<String, String>, Integer> entry : voToCount.entrySet()) {
 			String verb = entry.getKey().getLeft();

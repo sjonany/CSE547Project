@@ -19,12 +19,11 @@ public class SvmlightTestingDriver {
 	public static void main(String[] args) throws Exception {
 		if (args.length != 3) {
 			System.err
-			    .println("Usage: <path to train> <path to test> <models dir - must be a folder, here all the models + mapping reside>");
+			    .println("Usage: <path to stat> <path to test> <models dir - must be a folder, here all the models + mapping reside>");
 			return;
 		}
 
-		// Train is only needed to compute feature stats
-		String trainFile = args[0];
+		String statFile = args[0];
 		String testFile = args[1];
 		String modelDir = args[2];
 		if (modelDir.endsWith("/")) {
@@ -33,7 +32,7 @@ public class SvmlightTestingDriver {
 
 		VerbObjectStatComputer stats = new VerbObjectStatComputer();
 		System.out.println("Precomputing stats from train file...");
-		stats.load(trainFile);
+		stats.load(statFile);
 		System.out.println("Finished precomputation.");
 
 	  FeatureExtractor featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
