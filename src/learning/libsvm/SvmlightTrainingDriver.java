@@ -51,12 +51,17 @@ public class SvmlightTrainingDriver {
 		// For each verb, we train a single model, then write the model to disk
 		// Each such iteration requires going through the entire dataset
 		double[] lambdas = {10, 100, 1000, 10000};
-		for (int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
+		for (int verbId = 1128; verbId <= stats.getCountDistinctVerb(); verbId++) {
 			long curtime = System.currentTimeMillis();
-			LabeledFeatureVector[] trainSet = SvmlightUtil.filterDatasetToVerb(trainFile, stats.mapIdToVerb(verbId), featureExtractor);
-	    LabeledFeatureVector[] validationSet = SvmlightUtil.filterDatasetToVerb(validationFile, stats.mapIdToVerb(verbId), featureExtractor); 
+			String verbStr = stats.mapIdToVerb(verbId);
+			LabeledFeatureVector[] trainSet = SvmlightUtil.filterDatasetToVerb(trainFile, verbStr, featureExtractor);
+	    LabeledFeatureVector[] validationSet = SvmlightUtil.filterDatasetToVerb(validationFile, verbStr, featureExtractor); 
 			SVMLightModel[] models = new SVMLightModel[lambdas.length];
 			
+			// This verb cluster has been discarded from the training set becuase it has too few training examples. 
+			if(trainSet.length == 0 || validationSet.length == 0) { 
+				continue;
+			}
 			int bestLambdaIndex = -1;
 			double maxF1 = Double.NEGATIVE_INFINITY;
 			// Pick the lambda that works best against the validation set
@@ -84,8 +89,9 @@ public class SvmlightTrainingDriver {
 						bestLambdaIndex = lambdaIndex;
 					}
 				}
-				System.out.printf("Verb = %s, Lambda = %.6f, validation f1 = %.6f\n", stats.mapIdToVerb(verbId),
-				    lambdas[lambdaIndex], validationResult.getFscore());
+				System.out.printf("Verb = %s, Lambda = %.6f, validation f1 = %.6f, prec = %.6f, recall = %.6f, acc = %.6f\n", verbStr,
+				    lambdas[lambdaIndex], validationResult.getFscore(), validationResult.getPrecision(), 
+				    validationResult.getRecall(), validationResult.getAccuracy());
 			}
 			long elapsedTime = System.currentTimeMillis() - curtime;
 			models[bestLambdaIndex].writeModelToFile(String.format(MODEL_FILENAME_TEMPLATE, outputDir,

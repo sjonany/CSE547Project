@@ -1,6 +1,7 @@
 package learning.libsvm;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.util.ArrayList;
@@ -46,8 +47,11 @@ public class SvmlightModelViewer {
 		// -1 because I added a filler element
 		int numVerb = idToVerb.size() - 1;
 		for(int verbId = 1; verbId <= numVerb; verbId++) {
-			SVMLightModel model = SVMLightModel.readSVMLightModelFromURL(
-	    			new URL(String.format("file:" + MODEL_FILENAME_TEMPLATE, modelDir, verbId)));
+			String file = String.format(MODEL_FILENAME_TEMPLATE, modelDir, verbId);
+			if(!new File(file).exists()) {
+				continue;
+			}
+			SVMLightModel model = SVMLightModel.readSVMLightModelFromURL(new URL("file:" + file));
 			final double[] weights = model.getLinearWeights();
 			
 			// Sort the features in descending weight magnitude

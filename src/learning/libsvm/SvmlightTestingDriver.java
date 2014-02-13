@@ -1,6 +1,7 @@
 package learning.libsvm;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 
@@ -40,11 +41,16 @@ public class SvmlightTestingDriver {
 		// Load all the models
 		System.out.println("Loading " + stats.getCountDistinctVerb() + " models...");
 		SVMLightModel[] models = new SVMLightModel[stats.getCountDistinctVerb() + 1];
+		int numLoaded = 0;
 		for (int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
-			models[verbId] = SVMLightModel.readSVMLightModelFromURL(new URL(String
-			    .format("file:" + MODEL_FILENAME_TEMPLATE, modelDir, verbId)));
-			if (verbId % 100 == 0)
-				System.out.printf("Loaded %d out of %d\n", verbId,
+			String file = String.format(MODEL_FILENAME_TEMPLATE, modelDir, verbId);
+			if(!new File(file).exists()) {
+				continue;
+			}
+			models[verbId] = SVMLightModel.readSVMLightModelFromURL(new URL("file:" + file));
+			numLoaded++;
+			if (numLoaded % 100 == 0)
+				System.out.printf("Loaded %d out of %d\n", numLoaded,
 				    stats.getCountDistinctVerb());
 		}
 		System.out.println("Finished loading " + stats.getCountDistinctVerb()
@@ -60,11 +66,18 @@ public class SvmlightTestingDriver {
 			String verb = toks[0];
 			String obj = toks[1];
 			boolean isPositive = Integer.parseInt(toks[3]) == 1;
-			FeatureVector featVec = featureExtractor.convertDataPointToFeatureVector(verb, obj, isPositive);
 			
 			// if haven't seen the verb, just say no.
 			double prediction = FeatureExtractor.NEGATIVE_CLASS;
 			int verbId = stats.mapVerbToId(verb);
+			
+			// TODO: For now, only collect performance on trained models.
+			if(models[verbId] == null) {
+				line = in.readLine();
+				continue;
+			}
+			
+			FeatureVector featVec = featureExtractor.convertDataPointToFeatureVector(verb, obj, isPositive);
 			if (verbId >= 1) {
 				prediction = models[stats.mapVerbToId(verb)].classify(featVec);
 			}
