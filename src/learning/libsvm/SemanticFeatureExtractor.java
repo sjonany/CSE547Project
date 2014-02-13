@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jnisvmlight.LabeledFeatureVector;
+import util.WordnetCluster;
 
 /**
  * Feature extractor that only uses noun clusters as feature.
@@ -14,7 +15,11 @@ public class SemanticFeatureExtractor implements FeatureExtractor {
 	// Each bit vector will be of this length, a 1 indicates that the noun 
 	private static final int NUMBER_OF_NOUN_CLUSTERS = 26;
 	
-	public SemanticFeatureExtractor() {}
+	private WordnetCluster wordnetCluster;
+	
+	public SemanticFeatureExtractor(WordnetCluster wordnetCluster) {
+		this.wordnetCluster = wordnetCluster;
+	}
 	
 	@Override
   public LabeledFeatureVector convertDataPointToFeatureVector(String verb,
@@ -26,7 +31,7 @@ public class SemanticFeatureExtractor implements FeatureExtractor {
 		
 		
 		// convert bit vector to feature
-		int clusterBits = getCluster(object);
+		int clusterBits = wordnetCluster.getClusterVector(object);
 		for(int i = 0; i < NUMBER_OF_NOUN_CLUSTERS; i++) {
 			if((clusterBits & (1<<i)) != 0) {
 				nonZeroIndices.add(i+1);
@@ -50,9 +55,4 @@ public class SemanticFeatureExtractor implements FeatureExtractor {
 		LabeledFeatureVector feature = new LabeledFeatureVector(label, dims, vals);
 		return feature;
   }
-	
-	private int getCluster(String noun) {
-		// TODO: make another stats obj
-		return 3;
-	}
 }
