@@ -1,13 +1,12 @@
 package learning.libsvm;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.net.URL;
 
-import jnisvmlight.FeatureVector;
+import jnisvmlight.LabeledFeatureVector;
 import jnisvmlight.SVMLightModel;
 import util.StatUtil.ClassificationPerformance;
+import util.SvmlightUtil;
 
 /**
  * Driver for running trained lightsvm models against a test set Reference code
@@ -38,79 +37,39 @@ public class SvmlightTestingDriver {
 
 	  FeatureExtractor featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
 		
-		// Load all the models
-		System.out.println("Loading " + stats.getCountDistinctVerb() + " models...");
-		SVMLightModel[] models = new SVMLightModel[stats.getCountDistinctVerb() + 1];
-		int numLoaded = 0;
-		for (int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
+	  ClassificationPerformance globalResult = new ClassificationPerformance();
+	  // Perform test per verb - Assumes that we are only testing on verbs that we have trained on
+	  for(int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
+	  	String verbString = stats.mapIdToVerb(verbId);
+	  	// Load all the test cases for this verb
+	  	LabeledFeatureVector[] testSet = SvmlightUtil.filterDatasetToVerb(testFile, stats.mapIdToVerb(verbId), featureExtractor);
+	  	if(testSet.length == 0) {
+	  		continue;
+	  	}
+	  	
 			String file = String.format(MODEL_FILENAME_TEMPLATE, modelDir, verbId);
 			if(!new File(file).exists()) {
+				System.err.println("No model for verbId = " + verbId + " = " + verbString + 
+						", even though there are test cases for it");
 				continue;
 			}
-			models[verbId] = SVMLightModel.readSVMLightModelFromURL(new URL("file:" + file));
-			numLoaded++;
-			if (numLoaded % 100 == 0)
-				System.out.printf("Loaded %d out of %d\n", numLoaded,
-				    stats.getCountDistinctVerb());
-		}
-		System.out.println("Finished loading " + stats.getCountDistinctVerb()
-		    + " models...");
+			SVMLightModel model = SVMLightModel.readSVMLightModelFromURL(new URL("file:" + file));
+	  	ClassificationPerformance localResult = SvmlightUtil.testModel(model, testSet);
+	  	
+	  	globalResult.merge(localResult);
 
-		BufferedReader in = new BufferedReader(new FileReader(testFile));
-		String line = in.readLine();
-		int lineCount = 0;
-		ClassificationPerformance globalResult = new ClassificationPerformance();
-		
-		while (line != null) {
-			String[] toks = line.split("\t");
-			String verb = toks[0];
-			String obj = toks[1];
-			boolean isPositive = Integer.parseInt(toks[3]) == 1;
-			
-			// if haven't seen the verb, just say no.
-			double prediction = FeatureExtractor.NEGATIVE_CLASS;
-			int verbId = stats.mapVerbToId(verb);
-			
-			// TODO: For now, only collect performance on trained models.
-			if(models[verbId] == null) {
-				line = in.readLine();
-				continue;
-			}
-			
-			FeatureVector featVec = featureExtractor.convertDataPointToFeatureVector(verb, obj, isPositive);
-			if (verbId >= 1) {
-				prediction = models[stats.mapVerbToId(verb)].classify(featVec);
-			}
+			System.out.printf("Processed %d/%d verbs\nLocal result: acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n", 
+					verbId, stats.getCountDistinctVerb(),
+			    localResult.tp + localResult.tn, localResult.getDatasetSize(), localResult.getAccuracy(), localResult.getPrecision(),
+			    localResult.getRecall(), localResult.getFscore());
+	  	
+			System.out.printf("Global result: acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n",
+			    globalResult.tp + globalResult.tn, globalResult.getDatasetSize(), globalResult.getAccuracy(), globalResult.getPrecision(),
+			    globalResult.getRecall(), globalResult.getFscore());
+	  }
 
-			if (isPositive) {
-				if (prediction > 0) {
-					globalResult.tp++;
-				} else {
-					globalResult.fn++;
-				}
-			} else {
-				if (prediction > 0) {
-					globalResult.fp++;
-				} else {
-					globalResult.tn++;
-				}
-			}
-
-			line = in.readLine();
-			lineCount++;
-			if (lineCount % 100 == 0) {
-				System.out.printf("Processed %d, acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n", lineCount,
-				    globalResult.tp + globalResult.tn, globalResult.getDatasetSize(), globalResult.getAccuracy(), globalResult.getPrecision(),
-				    globalResult.getRecall(), globalResult.getFscore());
-			}
-		}
-		in.close();
-		System.out.printf("Processed %d, acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n", lineCount,
+		System.out.printf("Processed all! , acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n",
 		    globalResult.tp + globalResult.tn, globalResult.getDatasetSize(), globalResult.getAccuracy(), globalResult.getPrecision(),
 		    globalResult.getRecall(), globalResult.getFscore());
-		System.out.println("TP = " + globalResult.tp);
-		System.out.println("FP = " + globalResult.fp);
-		System.out.println("FN = " + globalResult.fn);
-		System.out.println("TN = " + globalResult.tn);
 	}
 }

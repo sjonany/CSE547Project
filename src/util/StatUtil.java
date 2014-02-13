@@ -43,5 +43,15 @@ public class StatUtil {
 		public int getDatasetSize() {
 			return tp + fp + fn + tn;
 		}
+		
+		/**
+		 * Merge stats with another classification performance.
+		 */
+		public void merge(ClassificationPerformance other) {
+			this.tp += other.tp;
+			this.fp += other.fp;
+			this.fn += other.fn;
+			this.tn += other.tn;
+		}
 	}
 }

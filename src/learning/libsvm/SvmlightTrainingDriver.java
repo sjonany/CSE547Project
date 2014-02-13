@@ -19,9 +19,10 @@ public class SvmlightTrainingDriver {
 	private static final String MODEL_FILENAME_TEMPLATE = "%s/model_%d.txt";
 
 	public static void main(String[] args) throws Exception {
-		if (args.length != 4) {
+		if (args.length != 5) {
 			System.err
-			    .println("Usage: <path to train> <path to validation> <path to stat> <output dir - must be a folder, will output all the models + mapping>");
+			    .println("Usage: <path to train> <path to validation> <path to stat> <output dir - must be a folder, will output all the models + mapping> " +
+			    		"<starting model id: int>");
 			return;
 		}
 
@@ -29,6 +30,7 @@ public class SvmlightTrainingDriver {
 		String validationFile = args[1];
 		String statFile = args[2];
 		String outputDir = args[3];
+		int startModelId = Integer.parseInt(args[4]);
 		if (outputDir.endsWith("/")) {
 			outputDir = outputDir.substring(0, outputDir.length() - 1);
 		}
@@ -51,14 +53,14 @@ public class SvmlightTrainingDriver {
 		// For each verb, we train a single model, then write the model to disk
 		// Each such iteration requires going through the entire dataset
 		double[] lambdas = {10, 100, 1000, 10000};
-		for (int verbId = 1128; verbId <= stats.getCountDistinctVerb(); verbId++) {
+		for (int verbId = startModelId; verbId <= stats.getCountDistinctVerb(); verbId++) {
 			long curtime = System.currentTimeMillis();
 			String verbStr = stats.mapIdToVerb(verbId);
 			LabeledFeatureVector[] trainSet = SvmlightUtil.filterDatasetToVerb(trainFile, verbStr, featureExtractor);
 	    LabeledFeatureVector[] validationSet = SvmlightUtil.filterDatasetToVerb(validationFile, verbStr, featureExtractor); 
 			SVMLightModel[] models = new SVMLightModel[lambdas.length];
 			
-			// This verb cluster has been discarded from the training set becuase it has too few training examples. 
+			// This verb cluster has been discarded from the training set because it has too few training examples. 
 			if(trainSet.length == 0 || validationSet.length == 0) { 
 				continue;
 			}
