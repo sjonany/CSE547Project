@@ -6,11 +6,12 @@ import jnisvmlight.SVMLightModel;
 import jnisvmlight.TrainingParameters;
 import util.StatUtil.ClassificationPerformance;
 import util.SvmlightUtil;
+import util.WordnetCluster;
 
 public class SingleModelExperiment {
 	public static void main(String[] args) throws Exception { 
-		if(args.length != 4 ) {
-			System.err.println("<path to train> <path to test> <path to stat> <verb to train: string>");
+		if(args.length != 5 ) {
+			System.err.println("<path to train> <path to test> <path to stat> <verb to train: string> <path to wordnet dict/>");
 			return;
 		}
 		
@@ -18,13 +19,16 @@ public class SingleModelExperiment {
 		String testFile = args[1];
 		String statFile = args[2];
 		String targetVerb = args[3];
+		String wordnetPath = args[4];
+		
+		WordnetCluster wordnet = new WordnetCluster(wordnetPath);
 
 	  VerbObjectStatComputer stats = new VerbObjectStatComputer();
 	  System.out.println("Precomputing stats from train file...");
 	  stats.load(statFile);
 	  System.out.println("Finished precomputation.");
 	  
-	  FeatureExtractor featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
+	  FeatureExtractor featureExtractor = new SemanticFeatureExtractor(wordnet);
 	  
 	  System.out.println("Loading train set");
     LabeledFeatureVector[] trainSet = SvmlightUtil.filterDatasetToVerb(trainFile, targetVerb, featureExtractor);

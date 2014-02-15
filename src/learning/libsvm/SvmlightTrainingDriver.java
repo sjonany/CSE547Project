@@ -7,6 +7,7 @@ import jnisvmlight.SVMLightInterface;
 import jnisvmlight.SVMLightModel;
 import jnisvmlight.TrainingParameters;
 import util.SvmlightUtil;
+import util.WordnetCluster;
 import util.StatUtil.ClassificationPerformance;
 
 /**
@@ -19,10 +20,10 @@ public class SvmlightTrainingDriver {
 	private static final String MODEL_FILENAME_TEMPLATE = "%s/model_%d.txt";
 
 	public static void main(String[] args) throws Exception {
-		if (args.length != 5) {
+		if (args.length != 6) {
 			System.err
 			    .println("Usage: <path to train> <path to validation> <path to stat> <output dir - must be a folder, will output all the models + mapping> " +
-			    		"<starting model id: int>");
+			    		"<wordnet path: string> <starting model id: int>");
 			return;
 		}
 
@@ -30,17 +31,19 @@ public class SvmlightTrainingDriver {
 		String validationFile = args[1];
 		String statFile = args[2];
 		String outputDir = args[3];
-		int startModelId = Integer.parseInt(args[4]);
+		String wordnetPath = args[4];
+		int startModelId = Integer.parseInt(args[5]);
 		if (outputDir.endsWith("/")) {
 			outputDir = outputDir.substring(0, outputDir.length() - 1);
 		}
 
+		WordnetCluster wordnet = new WordnetCluster(wordnetPath);
 		VerbObjectStatComputer stats = new VerbObjectStatComputer();
 		System.out.println("Precomputing stats from train file...");
 		stats.load(statFile);
 		System.out.println("Finished precomputation.");
-
-	  FeatureExtractor featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
+		 
+	  FeatureExtractor featureExtractor = new SemanticFeatureExtractor(wordnet);
 		
 		// Write the verb to id mapping
 		PrintWriter mappingWriter = new PrintWriter(String.format(
@@ -52,7 +55,7 @@ public class SvmlightTrainingDriver {
 
 		// For each verb, we train a single model, then write the model to disk
 		// Each such iteration requires going through the entire dataset
-		double[] lambdas = {10, 100, 1000, 10000};
+		double[] lambdas = {1, 10, 100, 1000, 10000};
 		for (int verbId = startModelId; verbId <= stats.getCountDistinctVerb(); verbId++) {
 			long curtime = System.currentTimeMillis();
 			String verbStr = stats.mapIdToVerb(verbId);
@@ -74,7 +77,6 @@ public class SvmlightTrainingDriver {
 				// Switch on some debugging output
 				// http://infolab.stanford.edu/~theobald/svmlight/doc/jnisvmlight/LearnParam.html
 				//trainParam.getLearningParameters().verbosity = 1;
-				// TODO: cross-validation for these params
 				trainParam.getLearningParameters().svm_costratio = 2.0;
 				trainParam.getLearningParameters().svm_c = lambda;
 			
