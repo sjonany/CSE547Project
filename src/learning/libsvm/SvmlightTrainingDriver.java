@@ -1,5 +1,7 @@
 package learning.libsvm;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.PrintWriter;
 
 import jnisvmlight.LabeledFeatureVector;
@@ -23,7 +25,7 @@ public class SvmlightTrainingDriver {
 		if (args.length != 6) {
 			System.err
 			    .println("Usage: <path to train> <path to validation> <path to stat> <output dir - must be a folder, will output all the models + mapping> " +
-			    		"<wordnet path: string> <starting model id: int>");
+			    		"<wordnet path: string> <path to verbs to train>");
 			return;
 		}
 
@@ -32,7 +34,7 @@ public class SvmlightTrainingDriver {
 		String statFile = args[2];
 		String outputDir = args[3];
 		String wordnetPath = args[4];
-		int startModelId = Integer.parseInt(args[5]);
+		String verbToTrainPath = args[5];
 		if (outputDir.endsWith("/")) {
 			outputDir = outputDir.substring(0, outputDir.length() - 1);
 		}
@@ -56,9 +58,12 @@ public class SvmlightTrainingDriver {
 		// For each verb, we train a single model, then write the model to disk
 		// Each such iteration requires going through the entire dataset
 		double[] lambdas = {1, 10, 100, 1000, 10000};
-		for (int verbId = startModelId; verbId <= stats.getCountDistinctVerb(); verbId++) {
+		BufferedReader verbToTrainReader = new BufferedReader(new FileReader(verbToTrainPath));
+		String line = verbToTrainReader.readLine();
+		int lineCount = 0;
+		while(line != null) {
 			long curtime = System.currentTimeMillis();
-			String verbStr = stats.mapIdToVerb(verbId);
+			String verbStr = line.split("\t")[0];
 			LabeledFeatureVector[] trainSet = SvmlightUtil.filterDatasetToVerb(trainFile, verbStr, featureExtractor);
 	    LabeledFeatureVector[] validationSet = SvmlightUtil.filterDatasetToVerb(validationFile, verbStr, featureExtractor); 
 			SVMLightModel[] models = new SVMLightModel[lambdas.length];
@@ -96,12 +101,18 @@ public class SvmlightTrainingDriver {
 				System.out.printf("Verb = %s, Lambda = %.6f, validation f1 = %.6f, prec = %.6f, recall = %.6f, acc = %.6f\n", verbStr,
 				    lambdas[lambdaIndex], validationResult.getFscore(), validationResult.getPrecision(), 
 				    validationResult.getRecall(), validationResult.getAccuracy());
-			}
+			}// end lambda
+			verbToTrainReader.close();
 			long elapsedTime = System.currentTimeMillis() - curtime;
+			
+			int verbId = stats.mapVerbToId(verbStr);
 			models[bestLambdaIndex].writeModelToFile(String.format(MODEL_FILENAME_TEMPLATE, outputDir,
 			    verbId));
-			System.out.printf("%d out of %d models trained. Takes %d ms. Best Lambda = %.6f, validation f1 = %.6f\n", verbId,
-			    stats.getCountDistinctVerb(), elapsedTime, lambdas[bestLambdaIndex], maxF1);
+			System.out.printf("Takes %d ms. Best Lambda = %.6f, validation f1 = %.6f\n",
+					elapsedTime, lambdas[bestLambdaIndex], maxF1);
+			System.out.printf("Finished training the first %d lines of %s\n", lineCount+1, verbToTrainPath);
+			line = verbToTrainReader.readLine();
+			lineCount++;
 		}
 	}
 }

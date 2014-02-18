@@ -1,6 +1,8 @@
 package learning.libsvm;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.net.URL;
 
 import jnisvmlight.LabeledFeatureVector;
@@ -18,9 +20,11 @@ public class SvmlightTestingDriver {
 	private static final String MODEL_FILENAME_TEMPLATE = "%s/model_%d.txt";
 
 	public static void main(String[] args) throws Exception {
-		if (args.length != 4) {
+		if (args.length != 5) {
 			System.err
-			    .println("Usage: <path to stat> <path to test> <models dir - must be a folder, here all the models + mapping reside> <wordnet path>");
+			    .println("Usage: <path to stat> <path to test>" +
+			    		" <models dir - must be a folder, here all the models + mapping reside> "
+			    		 + " <wordnet path> <path to verb to test>");
 			return;
 		}
 
@@ -28,6 +32,7 @@ public class SvmlightTestingDriver {
 		String testFile = args[1];
 		String modelDir = args[2];
 		String wordnetPath = args[3];
+		String verbToTestPath = args[4];
 		if (modelDir.endsWith("/")) {
 			modelDir = modelDir.substring(0, modelDir.length() - 1);
 		}
@@ -38,14 +43,19 @@ public class SvmlightTestingDriver {
 		System.out.println("Finished precomputation.");
 
 		WordnetCluster wordnet = new WordnetCluster(wordnetPath);
-	  FeatureExtractor featureExtractor = new VerbCooccurrenceAndSemanticFeatureExtractor(stats, wordnet);
+	  FeatureExtractor featureExtractor = new SemanticFeatureExtractor(wordnet);
 		
 	  ClassificationPerformance globalResult = new ClassificationPerformance();
-	  // Perform test per verb - Assumes that we are only testing on verbs that we have trained on
-	  for(int verbId = 1; verbId <= stats.getCountDistinctVerb(); verbId++) {
-	  	String verbString = stats.mapIdToVerb(verbId);
+
+		BufferedReader verbToTestReader = new BufferedReader(new FileReader(verbToTestPath));
+		String line = verbToTestReader.readLine();
+		int lineCount = 0;
+		while(line != null) {
+			// Perform test for each verb
+	  	String verbString = line.split("\t")[0];
+	  	int verbId = stats.mapVerbToId(verbString);
 	  	// Load all the test cases for this verb
-	  	LabeledFeatureVector[] testSet = SvmlightUtil.filterDatasetToVerb(testFile, stats.mapIdToVerb(verbId), featureExtractor);
+	  	LabeledFeatureVector[] testSet = SvmlightUtil.filterDatasetToVerb(testFile, verbString, featureExtractor);
 	  	if(testSet.length == 0) {
 	  		continue;
 	  	}
@@ -61,16 +71,20 @@ public class SvmlightTestingDriver {
 	  	
 	  	globalResult.merge(localResult);
 
-			System.out.printf("Processed %d/%d verbs\nLocal result: acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n", 
-					verbId, stats.getCountDistinctVerb(),
+			System.out.printf("Processed %d verbs\nLocal result: acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n", 
+					lineCount+1,
 			    localResult.tp + localResult.tn, localResult.getDatasetSize(), localResult.getAccuracy(), localResult.getPrecision(),
 			    localResult.getRecall(), localResult.getFscore());
 	  	
 			System.out.printf("Global result: acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n",
 			    globalResult.tp + globalResult.tn, globalResult.getDatasetSize(), globalResult.getAccuracy(), globalResult.getPrecision(),
 			    globalResult.getRecall(), globalResult.getFscore());
+			
+			lineCount++;
+			line = verbToTestReader.readLine();
 	  }
-
+		
+		verbToTestReader.close();
 		System.out.printf("Processed all! , acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n",
 		    globalResult.tp + globalResult.tn, globalResult.getDatasetSize(), globalResult.getAccuracy(), globalResult.getPrecision(),
 		    globalResult.getRecall(), globalResult.getFscore());
