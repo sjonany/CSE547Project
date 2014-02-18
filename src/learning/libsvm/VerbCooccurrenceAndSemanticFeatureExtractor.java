@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import jnisvmlight.LabeledFeatureVector;
+import util.WordnetCluster;
 
 /**
  * Feature extractor that only uses verb coocurence as feature
@@ -16,9 +17,11 @@ public class VerbCooccurrenceAndSemanticFeatureExtractor implements FeatureExtra
 	
 	/** Important stats needed to compute the feature vector. */
 	private VerbObjectStatComputer stats;
+	private WordnetCluster wordnet;
 	
-	public VerbCooccurrenceAndSemanticFeatureExtractor(VerbObjectStatComputer stats) {
+	public VerbCooccurrenceAndSemanticFeatureExtractor(VerbObjectStatComputer stats, WordnetCluster wordnet) {
 		this.stats = stats;
+		this.wordnet = wordnet;
 	}
 	
 	@Override
@@ -39,7 +42,7 @@ public class VerbCooccurrenceAndSemanticFeatureExtractor implements FeatureExtra
 		// Convert bit vector to feature
 		// Need to offset the feature index, since the feat indices before this, we have verbs
 		int featureOffset = stats.getCountDistinctVerb();
-		int clusterBits = getCluster(object);
+		int clusterBits = wordnet.getClusterVector(object);
 		for(int i = 0; i < NUMBER_OF_NOUN_CLUSTERS; i++) {
 			if((clusterBits & (1<<i)) != 0) {
 				nonZeroIndices.add(featureOffset + i + 1);
@@ -63,9 +66,4 @@ public class VerbCooccurrenceAndSemanticFeatureExtractor implements FeatureExtra
 		LabeledFeatureVector feature = new LabeledFeatureVector(label, dims, vals);
 		return feature;
   }
-	
-	private int getCluster(String noun) {
-		// TODO: make another stats obj
-		return 3;
-	}
 }

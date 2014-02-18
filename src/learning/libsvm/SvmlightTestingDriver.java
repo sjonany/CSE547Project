@@ -7,6 +7,7 @@ import jnisvmlight.LabeledFeatureVector;
 import jnisvmlight.SVMLightModel;
 import util.StatUtil.ClassificationPerformance;
 import util.SvmlightUtil;
+import util.WordnetCluster;
 
 /**
  * Driver for running trained lightsvm models against a test set Reference code
@@ -17,15 +18,16 @@ public class SvmlightTestingDriver {
 	private static final String MODEL_FILENAME_TEMPLATE = "%s/model_%d.txt";
 
 	public static void main(String[] args) throws Exception {
-		if (args.length != 3) {
+		if (args.length != 4) {
 			System.err
-			    .println("Usage: <path to stat> <path to test> <models dir - must be a folder, here all the models + mapping reside>");
+			    .println("Usage: <path to stat> <path to test> <models dir - must be a folder, here all the models + mapping reside> <wordnet path>");
 			return;
 		}
 
 		String statFile = args[0];
 		String testFile = args[1];
 		String modelDir = args[2];
+		String wordnetPath = args[3];
 		if (modelDir.endsWith("/")) {
 			modelDir = modelDir.substring(0, modelDir.length() - 1);
 		}
@@ -35,7 +37,8 @@ public class SvmlightTestingDriver {
 		stats.load(statFile);
 		System.out.println("Finished precomputation.");
 
-	  FeatureExtractor featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
+		WordnetCluster wordnet = new WordnetCluster(wordnetPath);
+	  FeatureExtractor featureExtractor = new VerbCooccurrenceAndSemanticFeatureExtractor(stats, wordnet);
 		
 	  ClassificationPerformance globalResult = new ClassificationPerformance();
 	  // Perform test per verb - Assumes that we are only testing on verbs that we have trained on

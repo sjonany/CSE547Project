@@ -6,9 +6,9 @@ import jnisvmlight.LabeledFeatureVector;
 import jnisvmlight.SVMLightInterface;
 import jnisvmlight.SVMLightModel;
 import jnisvmlight.TrainingParameters;
+import util.StatUtil.ClassificationPerformance;
 import util.SvmlightUtil;
 import util.WordnetCluster;
-import util.StatUtil.ClassificationPerformance;
 
 /**
  * Driver for creating svmlight models trained on given dataset. Reference code
@@ -43,7 +43,7 @@ public class SvmlightTrainingDriver {
 		stats.load(statFile);
 		System.out.println("Finished precomputation.");
 		 
-	  FeatureExtractor featureExtractor = new SemanticFeatureExtractor(wordnet);
+	  FeatureExtractor featureExtractor = new VerbCooccurrenceAndSemanticFeatureExtractor(stats, wordnet);
 		
 		// Write the verb to id mapping
 		PrintWriter mappingWriter = new PrintWriter(String.format(
