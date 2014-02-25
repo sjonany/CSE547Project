@@ -33,7 +33,7 @@ vnIdx.dat <- read.table(header=TRUE, "vnIdx.txt")
 # vnIdx lists all the (vIdx,nIdx) instances (with duplicates), sorted first by vIdx then by nIdx
 vnIdx <- as.matrix(vnIdx.dat) # a one by |corpus| vector
 
-C <- length(vnIdx)
+C <- dim(vnIdx)[1]
 
 ######################################
 # DATA STRUCTURE INITIALIZATION
