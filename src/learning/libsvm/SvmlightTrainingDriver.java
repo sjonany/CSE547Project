@@ -102,7 +102,6 @@ public class SvmlightTrainingDriver {
 				    lambdas[lambdaIndex], validationResult.getFscore(), validationResult.getPrecision(), 
 				    validationResult.getRecall(), validationResult.getAccuracy());
 			}// end lambda
-			verbToTrainReader.close();
 			long elapsedTime = System.currentTimeMillis() - curtime;
 			
 			int verbId = stats.mapVerbToId(verbStr);
@@ -114,5 +113,7 @@ public class SvmlightTrainingDriver {
 			line = verbToTrainReader.readLine();
 			lineCount++;
 		}
+
+		verbToTrainReader.close();
 	}
 }

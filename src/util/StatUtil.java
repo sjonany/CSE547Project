@@ -54,4 +54,7 @@ public class StatUtil {
 			this.tn += other.tn;
 		}
 	}
+	public static void main(String[] args){
+		System.out.println(Stemmer.getInstance().getStemmedForm("as"));
+	}
 }
