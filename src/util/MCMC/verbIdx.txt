@@ -1,4 +1,3 @@
-header
 eat
 pray
 love
