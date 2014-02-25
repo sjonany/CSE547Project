@@ -10,8 +10,8 @@ alpha <- 50 / T # used to smooth C^{DT}
 burnin <- 0
 #numIter <- 1000 # total number of iterations (including burn-in iterations) 
 numIter <- 10
-lag <- 50 # will take sample every lag number of iterations 
-numSampsPerLag = 5 # number of consecutive iterations to sample from 
+lag <- 1 # will take sample every lag number of iterations 
+numSampsPerLag = 1 # number of consecutive iterations to sample from 
 totNumSamps = 0 # will be incremented as new samples come
 
 ######################################
