@@ -6,12 +6,12 @@ T <- 10
 gamma <- 0.01 # used to smooth C^{WT}
 alpha <- 50 / T # used to smooth C^{DT}
 
-burnin <- 750 # number of steps to advance the Markov chain before start taking samples
-#burnin <- 0
-numIter <- 1000 # total number of iterations (including burn-in iterations) 
-#numIter <- 10
-lag <- 50 # will take sample every lag number of iterations 
-numSampsPerLag = 50 # number of consecutive iterations to sample from 
+#burnin <- 750 # number of steps to advance the Markov chain before start taking samples
+burnin <- 0
+#numIter <- 1000 # total number of iterations (including burn-in iterations) 
+numIter <- 10
+lag <- 1 # will take sample every lag number of iterations 
+numSampsPerLag = 1 # number of consecutive iterations to sample from 
 totNumSamps = 0 # will be incremented as new samples come
 
 ######################################
@@ -32,11 +32,12 @@ nounIdx <- as.vector(nounIdx.dat) # a one by N vector
 
 N <- dim(nounIdx)[1]
 
-vnIdx.dat <- read.csv(header = TRUE, "vnIdx.txt")
+#vnIdx.dat <- read.csv(header = TRUE, "vnIdx.txt")
 # vnIdx lists all the (vIdx,nIdx) instances (with duplicates), sorted first by vIdx then by nIdx
-vnIdx <- as.matrix(vnIdx.dat) # a one by |corpus| vector
+#vnIdx <- as.matrix(vnIdx.dat) # a one by |corpus| vector
 
-C <- dim(vnIdx)[1]
+#C <- dim(vnIdx)[1]
+C <- 1324 # total number of tuples in vnIdx
 
 ######################################
 # MARKOV CHAIN INITIALIZATION
@@ -55,14 +56,26 @@ CWT <- matrix(0, N, T)
 #C^{VT}_{v,t} tells us the number of times a topic t has been assigned to the nouns that ever appear in a (v,n) pair
 CVT <- matrix(0, V, T)
 
+# file connection for the vnIdx file
+vnIdxCon <- file("vnIdx.txt", "r")
+
 for (i in 1:C) {
   t <- sample(T, 1) # randomly choose t = 1 to T
   z[i] <- t
-  curV <- vnIdx[i,1]
-  curN <- vnIdx[i,2]
+  
+  #curV <- vnIdx[i,1]
+  #curN <- vnIdx[i,2]
+  
+  nextLine <- readLines(vnIdxCon, ok=FALSE, 1)
+  vnPair = as.numeric(unlist(strsplit(nextLine, ",")))
+  curV <- vnPair[1]
+  curN <- vnPair[2]
+  
+  #print(sprintf("curV = %d, curN=%d", curV, curN))
   CWT[curN,t] = CWT[curN,t] + 1
   CVT[curV,t] = CVT[curV,t] + 1
 }
+close(vnIdxCon)
 #print(CWT)
 #print(CVT)
 
@@ -71,12 +84,20 @@ for (i in 1:C) {
 ######################################
 for (iter in 1:numIter) {
   print(sprintf("At iteration %d", iter))
+  
+  # file connection for the vnIdx file
+  vnIdxCon <- file("vnIdx.txt", "r")
+  
   for (i in 1:C) {
 
     tau <- z[i] #  the current topic assignment for this pair
-    # TODO:
-    curV <- vnIdx[i,1]
-    curN <- vnIdx[i,2]
+    #curV <- vnIdx[i,1]
+    #curN <- vnIdx[i,2]
+    nextLine <- readLines(vnIdxCon, ok=FALSE, 1)
+    vnPair = as.numeric(unlist(strsplit(nextLine, ",")))
+    curV <- vnPair[1]
+    curN <- vnPair[2]
+    
     #print(sprintf("current topic id for (%d,%d) is %d", curV, curN, tau))
     #print(CVT)
     #print(CWT)
@@ -123,6 +144,7 @@ for (iter in 1:numIter) {
     
     totNumSamps = totNumSamps + 1
   }  
+  close(vnIdxCon)
 }
 
 ###############################################
@@ -133,8 +155,8 @@ beta <- cumBeta / totNumSamps
 
 theta <- cumTheta / totNumSamps
 
-write(t(beta), "beta.txt", ncolumns=N, sep = "\t")
-write(t(theta), "theta.txt", ncolumns=T, sep = "\t")
+#write(t(beta), "beta.txt", ncolumns=N, sep = "\t")
+#write(t(theta), "theta.txt", ncolumns=T, sep = "\t")
 
 ###############################################
 # TESTS
