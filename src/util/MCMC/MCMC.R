@@ -6,12 +6,12 @@ T <- 10
 gamma <- 0.01 # used to smooth C^{WT}
 alpha <- 50 / T # used to smooth C^{DT}
 
-#burnin <- 750 # number of steps to advance the Markov chain before start taking samples
-burnin <- 0
-#numIter <- 1000 # total number of iterations (including burn-in iterations) 
-numIter <- 10
-lag <- 1 # will take sample every lag number of iterations 
-numSampsPerLag = 1 # number of consecutive iterations to sample from 
+burnin <- 750 # number of steps to advance the Markov chain before start taking samples
+#burnin <- 0
+numIter <- 1000 # total number of iterations (including burn-in iterations) 
+#numIter <- 10
+lag <- 50 # will take sample every lag number of iterations 
+numSampsPerLag = 50 # number of consecutive iterations to sample from 
 totNumSamps = 0 # will be incremented as new samples come
 
 ######################################
@@ -32,7 +32,7 @@ nounIdx <- as.vector(nounIdx.dat) # a one by N vector
 
 N <- dim(nounIdx)[1]
 
-vnIdx.dat <- read.table("vnIdx.txt")
+vnIdx.dat <- read.csv(header = TRUE, "vnIdx.txt")
 # vnIdx lists all the (vIdx,nIdx) instances (with duplicates), sorted first by vIdx then by nIdx
 vnIdx <- as.matrix(vnIdx.dat) # a one by |corpus| vector
 
@@ -63,21 +63,23 @@ for (i in 1:C) {
   CWT[curN,t] = CWT[curN,t] + 1
   CVT[curV,t] = CVT[curV,t] + 1
 }
-print(CWT)
-print(CVT)
+#print(CWT)
+#print(CVT)
 
 ######################################
 # COLLAPSED GIBBS SAMPLING
 ######################################
 for (iter in 1:numIter) {
+  print(sprintf("At iteration %d", iter))
   for (i in 1:C) {
 
     tau <- z[i] #  the current topic assignment for this pair
+    # TODO:
     curV <- vnIdx[i,1]
     curN <- vnIdx[i,2]
-    print(sprintf("current topic id for (%d,%d) is %d", curV, curN, tau))
-    print(CVT)
-    print(CWT)
+    #print(sprintf("current topic id for (%d,%d) is %d", curV, curN, tau))
+    #print(CVT)
+    #print(CWT)
     
     if (CWT[curN,tau] == 0) print(sprintf("warning: subtracting zero entry CWT[%d,%d]", curN, tau))
     CWT[curN,tau] = CWT[curN,tau] - 1
@@ -92,16 +94,16 @@ for (iter in 1:numIter) {
       resampleDistro[t] <- pnt * ptv
     }
 
-    print(resampleDistro)
+    #print(resampleDistro)
     
     tau <- sample(T, 1, prob = resampleDistro)
 
-    print(sprintf("resampling topic id for (%d,%d) to %d", curV, curN, tau))
+    #print(sprintf("resampling topic id for (%d,%d) to %d", curV, curN, tau))
     CWT[curN,tau] = CWT[curN,tau] + 1
     CVT[curV,tau] = CVT[curV,tau] + 1
     z[i] <- tau
-    print(CVT)
-    print(CWT)
+    #print(CVT)
+    #print(CWT)
   }
   
   if (iter > burnin && (iter %% lag) < numSampsPerLag) {
@@ -130,6 +132,9 @@ for (iter in 1:numIter) {
 beta <- cumBeta / totNumSamps
 
 theta <- cumTheta / totNumSamps
+
+write(t(beta), "beta.txt", ncolumns=N, sep = "\t")
+write(t(theta), "theta.txt", ncolumns=T, sep = "\t")
 
 ###############################################
 # TESTS
