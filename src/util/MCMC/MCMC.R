@@ -1,17 +1,19 @@
+#setwd("C:/Users/Jerry/CSE547FinalProj/CSE547Project/src/util/MCMC")
+
 ######################################
 # HYPERPARAMETER INITIALIZATION
 ######################################
-#T <- 100 # number of topics
-T <- 10
+T <- 100 # number of topics
+#T <- 10
 gamma <- 0.01 # used to smooth C^{WT}
 alpha <- 50 / T # used to smooth C^{DT}
 
-#burnin <- 750 # number of steps to advance the Markov chain before start taking samples
-burnin <- 0
-#numIter <- 1000 # total number of iterations (including burn-in iterations) 
-numIter <- 10
-lag <- 1 # will take sample every lag number of iterations 
-numSampsPerLag = 1 # number of consecutive iterations to sample from 
+burnin <- 750 # number of steps to advance the Markov chain before start taking samples
+#burnin <- 0
+numIter <- 1000 # total number of iterations (including burn-in iterations) 
+#numIter <- 20
+lag <- 50 # will take sample every lag number of iterations 
+numSampsPerLag = 5 # number of consecutive iterations to sample from 
 totNumSamps = 0 # will be incremented as new samples come
 
 ######################################
@@ -37,8 +39,9 @@ N <- dim(nounIdx)[1]
 #vnIdx <- as.matrix(vnIdx.dat) # a one by |corpus| vector
 
 #C <- dim(vnIdx)[1]
-C <- 1324 # total number of tuples in vnIdx
-
+C <- 6594702 # total number of tuples in vnIdx
+# NOTE: vnIdx test file must have an empty line at the end
+print(sprintf("start training with %d tuples in vnIdx...", C))
 ######################################
 # MARKOV CHAIN INITIALIZATION
 ######################################
@@ -56,8 +59,14 @@ CWT <- matrix(0, N, T)
 #C^{VT}_{v,t} tells us the number of times a topic t has been assigned to the nouns that ever appear in a (v,n) pair
 CVT <- matrix(0, V, T)
 
+# tells us the number of nouns that have been assigned to each topic (i.e. the column sum of CWT)
+numNounsInTopic <- rep(0, T)
+
+# tells us the number of nouns associated with each verb (i.e. the row sum of CVT)
+numNounsWithVerb <- rep(0, V)
+
 # file connection for the vnIdx file
-vnIdxCon <- file("vnIdx.txt", "r")
+vnIdxCon <- file("vnIdxSmall.txt", "r")
 
 for (i in 1:C) {
   t <- sample(T, 1) # randomly choose t = 1 to T
@@ -74,6 +83,9 @@ for (i in 1:C) {
   #print(sprintf("curV = %d, curN=%d", curV, curN))
   CWT[curN,t] = CWT[curN,t] + 1
   CVT[curV,t] = CVT[curV,t] + 1
+  
+  numNounsInTopic[t] = numNounsInTopic[t] + 1
+  numNounsWithVerb[curV] = numNounsWithVerb[curV] + 1
 }
 close(vnIdxCon)
 #print(CWT)
@@ -86,7 +98,7 @@ for (iter in 1:numIter) {
   print(sprintf("At iteration %d", iter))
   
   # file connection for the vnIdx file
-  vnIdxCon <- file("vnIdx.txt", "r")
+  vnIdxCon <- file("vnIdxSmall.txt", "r")
   
   for (i in 1:C) {
 
@@ -104,14 +116,18 @@ for (iter in 1:numIter) {
     
     if (CWT[curN,tau] == 0) print(sprintf("warning: subtracting zero entry CWT[%d,%d]", curN, tau))
     CWT[curN,tau] = CWT[curN,tau] - 1
+  
     if (CVT[curV,tau] == 0) print(sprintf("warning: subtracting zero entry CVT[%d,%d]", curV, tau))
     CVT[curV,tau] = CVT[curV,tau] - 1
+    
+    numNounsInTopic[tau] = numNounsInTopic[tau] - 1
+    numNounsWithVerb[curV] = numNounsWithVerb[curV] - 1
     
     resampleDistro <- rep(0, T)
     
     for (t in 1:T) {
-      pnt <- (CWT[curN,t] + gamma) / (sum(CWT[,t]) + N * gamma)
-      ptv <- (CVT[curV,t] + alpha) / (sum(CVT[curV,]) + T * alpha)
+      pnt <- (CWT[curN,t] + gamma) / (numNounsInTopic[t] + N * gamma)
+      ptv <- (CVT[curV,t] + alpha) / (numNounsWithVerb[curV] + T * alpha)
       resampleDistro[t] <- pnt * ptv
     }
 
@@ -122,6 +138,10 @@ for (iter in 1:numIter) {
     #print(sprintf("resampling topic id for (%d,%d) to %d", curV, curN, tau))
     CWT[curN,tau] = CWT[curN,tau] + 1
     CVT[curV,tau] = CVT[curV,tau] + 1
+    
+    numNounsInTopic[tau] = numNounsInTopic[tau] + 1
+    numNounsWithVerb[curV] = numNounsWithVerb[curV] + 1
+    
     z[i] <- tau
     #print(CVT)
     #print(CWT)
@@ -131,14 +151,14 @@ for (iter in 1:numIter) {
     # only sample when iter = k*lag, k*lag+1, ..., k * lag + (numSampsPerLag - 1)
     for (t in 1:T) {
       for (n in 1:N) {
-        cumBeta[t,n] = cumBeta[t,n] + (CWT[n,t] + gamma) / (sum(CWT[,t]) + N * gamma)
+        cumBeta[t,n] = cumBeta[t,n] + (CWT[n,t] + gamma) / (numNounsInTopic[t] + N * gamma)
       }
     }
     
     theta <- matrix(0, V, T)
     for (v in 1:V) {
       for (t in 1:T) {
-        cumTheta[v,t] = cumTheta[v,t] + (CVT[v,t] + alpha) / (sum(CVT[v,]) + T * alpha)
+        cumTheta[v,t] = cumTheta[v,t] + (CVT[v,t] + alpha) / (numNounsWithVerb[curV] + T * alpha)
       }
     }
     
