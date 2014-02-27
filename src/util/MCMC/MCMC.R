@@ -8,12 +8,12 @@ T <- 100 # number of topics
 gamma <- 0.01 # used to smooth C^{WT}
 alpha <- 50 / T # used to smooth C^{DT}
 
-burnin <- 750 # number of steps to advance the Markov chain before start taking samples
-#burnin <- 0
-numIter <- 1000 # total number of iterations (including burn-in iterations) 
-#numIter <- 20
-lag <- 50 # will take sample every lag number of iterations 
-numSampsPerLag = 5 # number of consecutive iterations to sample from 
+#burnin <- 750 # number of steps to advance the Markov chain before start taking samples
+burnin <- 0
+#numIter <- 1000 # total number of iterations (including burn-in iterations) 
+numIter <- 20
+lag <- 1 # will take sample every lag number of iterations 
+numSampsPerLag = 1 # number of consecutive iterations to sample from 
 totNumSamps = 0 # will be incremented as new samples come
 
 ######################################
@@ -69,9 +69,12 @@ numNounsWithVerb <- rep(0, V)
 vnIdxCon <- file("vnIdxSmall.txt", "r")
 
 for (i in 1:C) {
+  
+  
   t <- sample(T, 1) # randomly choose t = 1 to T
   z[i] <- t
   
+  if(i %% 10000 == 0) print(sprintf("assigning tuple %d to topic %d", i, t))
   #curV <- vnIdx[i,1]
   #curN <- vnIdx[i,2]
   
@@ -155,10 +158,9 @@ for (iter in 1:numIter) {
       }
     }
     
-    theta <- matrix(0, V, T)
     for (v in 1:V) {
       for (t in 1:T) {
-        cumTheta[v,t] = cumTheta[v,t] + (CVT[v,t] + alpha) / (numNounsWithVerb[curV] + T * alpha)
+        cumTheta[v,t] = cumTheta[v,t] + (CVT[v,t] + alpha) / (numNounsWithVerb[v] + T * alpha)
       }
     }
     
