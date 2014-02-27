@@ -40,8 +40,22 @@ public class LDAModel {
 		return idToNoun[nid];
 	}
 	
+	public double getPrTopicForVerb(int tid, String verb) {
+		if(!verbToId.containsKey(verb)) {
+			return 0;
+		}
+		return topicDistPerVerb[verbToId.get(verb)][tid];
+	}
+	
 	public double getPrTopicForVerb(int tid, int vid) {
 		return topicDistPerVerb[vid][tid];
+	}
+
+	public double getPrNounForTopic(String noun, int tid) {
+		if(!nounToId.containsKey(noun)) {
+			return 0;
+		}
+		return nounDistPerTopic[tid][nounToId.get(noun)];
 	}
 	
 	public double getPrNounForTopic(int nid, int tid) {
