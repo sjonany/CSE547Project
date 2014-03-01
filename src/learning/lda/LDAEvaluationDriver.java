@@ -18,7 +18,8 @@ public class LDAEvaluationDriver {
 		String testPath = args[1];
 		/** genCorpus will be used to compute P(D) and P(a1| D) */
 		String genCorpusPath = args[2];
-		
+
+		LDAModel model = LDAModel.loadModel(modelDir);
 		// Precompute the prior infos needed to convert LDA judgment to discriminative
 		// count(noun ^ distractor) 
 		Map<String, Integer> countNAndD = new HashMap<String, Integer>();
@@ -54,7 +55,6 @@ public class LDAEvaluationDriver {
 		genReader.close();
 		System.out.println("Finished precomputing priors from generalization corpus.");
 		
-		LDAModel model = LDAModel.loadModel(modelDir);
 		BufferedReader testReader = new BufferedReader(new FileReader(testPath));
 		lineCount = 0;
 	  ClassificationPerformance result = new ClassificationPerformance();

@@ -11,10 +11,10 @@ import org.apache.commons.lang3.tuple.Pair;
  * Driver for seeing the LDA model in a more interpretable way.
  */
 public class FeatureInterpretabilityDriver {
-	private static final int TOP_K = 5;
+	private static final int TOP_K = 10;
 	
 	public static void main(String[] args) throws Exception {
-		String modelDir = "/Users/sjonany/NELResources/SelectionalPref/dataset";
+		String modelDir = "/Users/sjonany/Downloads/MCMC";
 		LDAModel model = LDAModel.loadModel(modelDir);
 		
 		for(int topic = 0; topic < model.getTopicCount(); topic++) {

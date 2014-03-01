@@ -1,14 +1,20 @@
+package util;
+
 import java.io.*;
 import java.util.*;
 
 
 public class MCMC {
-
 	/**
 	 * @param args
 	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException {
+		String baseDir = args[0];
+		if(!baseDir.endsWith("/")) {
+			baseDir += "/";
+		}
+		
 		// TODO Auto-generated method stub
 		int T = 100;
 		double gamma = 0.01;
@@ -29,7 +35,7 @@ public class MCMC {
 		/*######################################
 		# DATA INGESTION
 		######################################*/
-		BufferedReader br = new BufferedReader(new FileReader("verbIdx.txt"));
+		BufferedReader br = new BufferedReader(new FileReader(baseDir + "verbIdx.txt"));
 		List<String> verbIdx = new ArrayList<String>();
 		
 		try{
@@ -45,7 +51,7 @@ public class MCMC {
 		
 		int V = verbIdx.size();
 
-		BufferedReader brNoun = new BufferedReader(new FileReader("nounIdx.txt"));
+		BufferedReader brNoun = new BufferedReader(new FileReader(baseDir + "nounIdx.txt"));
 		List<String> nounIdx = new ArrayList<String>();
 		
 		try {
@@ -89,7 +95,7 @@ public class MCMC {
 		int [] numNounsWithVerb = new int [V];
 
 		// file connection for the vnIdx file
-		BufferedReader brVn = new BufferedReader(new FileReader("vnIdxSmall.txt"));
+		BufferedReader brVn = new BufferedReader(new FileReader(baseDir + "vnIdxSmall.txt"));
 		
 		Random r = new Random();
 		for (int i = 0; i < C; i++) {
@@ -134,7 +140,7 @@ public class MCMC {
 		  System.out.println("At iteration " + iter);
 		  
 		  // file connection for the vnIdx file
-		  brVn = new BufferedReader(new FileReader("vnIdxSmall.txt"));
+		  brVn = new BufferedReader(new FileReader(baseDir + "vnIdxSmall.txt"));
 		  
 		  for (int i = 0; i < C; i++) {
 
@@ -177,7 +183,7 @@ public class MCMC {
 		  
 		  // stores the model state after burnin is done (for future training)
 		  if (iter == burnin) {
-		    PrintWriter printWriter = new PrintWriter("z.txt");
+		    PrintWriter printWriter = new PrintWriter(baseDir + "z.txt");
 		    for (int i = 0; i < C; i++) {
 		        printWriter.println(z[i]);
 		    }
@@ -188,7 +194,7 @@ public class MCMC {
 		    // only sample when iter = k*lag, k*lag+1, ..., k * lag + (numSampsPerLag - 1)
 			  
 			// accumulate the current sample, and take a snapshot of the current sample
-			PrintWriter printWriter = new PrintWriter("betaAtIter" + iter + ".txt");
+			PrintWriter printWriter = new PrintWriter(baseDir + "betaAtIter" + iter + ".txt");
 		    for (int t = 0; t < T; t++) {
 		      for (int n = 0; n < N; n++) {
 		    	double curEnt = (CWT[n][t] + gamma) / (numNounsInTopic[t] + N * gamma);
@@ -204,7 +210,7 @@ public class MCMC {
 		    }    
 		    printWriter.close();
 		    
-		    printWriter = new PrintWriter("thetaAtIter" + iter + ".txt");
+		    printWriter = new PrintWriter(baseDir + "thetaAtIter" + iter + ".txt");
 		    
 		    for (int v = 0; v < V; v++) {
 		      for (int t = 0; t < T; t++) {
@@ -230,7 +236,7 @@ public class MCMC {
 		double [][] beta = new double [T][N];
 		double [][] theta = new double [V][T];
  
-		PrintWriter printWriter = new PrintWriter("betaAvg.txt");
+		PrintWriter printWriter = new PrintWriter(baseDir + "betaAvg.txt");
 		
 	    for (int t = 0; t < T; t++) {
 	      for (int n = 0; n < N; n++) {
@@ -247,7 +253,7 @@ public class MCMC {
 	    
 	    printWriter.close();
 	    
-	    printWriter = new PrintWriter("thetaAvg.txt");
+	    printWriter = new PrintWriter(baseDir + "thetaAvg.txt");
 	    for (int v = 0; v < V; v++) {
 	      for (int t = 0; t < T; t++) {
 	        theta[v][t] = cumTheta[v][t] / totNumSamps;
