@@ -23,7 +23,7 @@ public class LDAEvaluationDriver {
 		// Precompute the prior infos needed to convert LDA judgment to discriminative
 		// count(noun ^ distractor) 
 		Map<String, Integer> countNAndD = new HashMap<String, Integer>();
-		long countDistractor =  0;
+		long countDistractor = 0;
 		long countData = 0;
 		
 		BufferedReader genReader = new BufferedReader(new FileReader(genCorpusPath));
@@ -68,7 +68,7 @@ public class LDAEvaluationDriver {
     	
     	String obj = toks[1];
     	boolean isPositiveGold = Integer.parseInt(toks[3]) == 1;
-    	boolean isPositivePrediction = predictIsDistractor(model, verb, obj, prNGivenD, prD);
+    	boolean isPositivePrediction = predictIsNotDistractor(model, verb, obj, prNGivenD, prD);
     	
     	if(isPositiveGold) {
     		if(isPositivePrediction) {
@@ -93,7 +93,7 @@ public class LDAEvaluationDriver {
     testReader.close();
 	}
 	
-	private static boolean predictIsDistractor(LDAModel model, String verb, String obj, Map<String, Double> prNGivenD,
+	private static boolean predictIsNotDistractor(LDAModel model, String verb, String obj, Map<String, Double> prNGivenD,
 			double prD) {
 		double pLda = 0.0;
 		for(int topic = 0; topic < model.getTopicCount(); topic++) {
@@ -102,6 +102,6 @@ public class LDAEvaluationDriver {
 		double prN_D = prNGivenD.containsKey(obj) ? prNGivenD.get(obj) : 0.0;
 		double num = (1.0 - prD)  * pLda;
 		double den = prD * prN_D + num;
-		return num / den > 0.5;
+		return num / den > 0.2;
 	}
 }

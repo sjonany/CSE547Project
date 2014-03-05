@@ -10,13 +10,14 @@ public class MCMC {
 	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException {
+		System.out.println("This is the new MCMC");
 		String baseDir = args[0];
 		if(!baseDir.endsWith("/")) {
 			baseDir += "/";
 		}
 		
 		// TODO Auto-generated method stub
-		int T = 100;
+		int T = 300;
 		double gamma = 0.01;
 		double alpha = 50.0 / T;
 		

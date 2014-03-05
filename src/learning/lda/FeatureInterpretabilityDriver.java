@@ -14,7 +14,7 @@ public class FeatureInterpretabilityDriver {
 	private static final int TOP_K = 10;
 	
 	public static void main(String[] args) throws Exception {
-		String modelDir = "/Users/sjonany/Downloads/MCMC";
+		String modelDir = "/Users/sjonany/NELResources/SelectionalPref/gibbsSampling/topic_300_model";
 		LDAModel model = LDAModel.loadModel(modelDir);
 		
 		for(int topic = 0; topic < model.getTopicCount(); topic++) {
