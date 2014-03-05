@@ -2,22 +2,31 @@ package learning.lda;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 import util.StatUtil;
 import util.StatUtil.ClassificationPerformance;
 
 /**
- * Driver for testing LDA model on dataset.
+ * Vary the decision threshold value for the discriminative version of LDA
+ * and give precision recall points 
  */
-public class LDAEvaluationDriver {
+public class LDAVaryingInterceptDriver {
 	public static void main(String[] args) throws Exception {
 		String modelDir = args[0];
 		String testPath = args[1];
 		/** genCorpus will be used to compute P(D) and P(a1| D) */
 		String genCorpusPath = args[2];
+		String outputFile = args[3];
 
 		LDAModel model = LDAModel.loadModel(modelDir);
 		// Precompute the prior infos needed to convert LDA judgment to discriminative
@@ -57,8 +66,12 @@ public class LDAEvaluationDriver {
 		
 		BufferedReader testReader = new BufferedReader(new FileReader(testPath));
 		lineCount = 0;
-	  ClassificationPerformance result = new ClassificationPerformance();
 		line = testReader.readLine();
+
+	  // List of all the test points, where the boolean = true if gold is positive
+	  // and the double is the w.x value returned by the lda model for that point
+	  List<Pair<Double, Boolean>> gradedTestPoint = new ArrayList<Pair<Double, Boolean>>();
+	  Set<Double> thresholdVals = new HashSet<Double>();
     while(line != null) {
     	lineCount++;
     	if(lineCount % 100000 == 0)
@@ -68,33 +81,44 @@ public class LDAEvaluationDriver {
     	
     	String obj = toks[1];
     	boolean isPositiveGold = Integer.parseInt(toks[3]) == 1;
-    	boolean isPositivePrediction = predictIsNotDistractor(model, verb, obj, prNGivenD, prD);
-    	
-    	if(isPositiveGold) {
-    		if(isPositivePrediction) {
-    			result.tp++;
-    		} else {
-    			result.fn++;
-    		}
-    	} else {
-    		if(isPositivePrediction) {
-    			result.fp++;
-    		} else {
-    			result.tn++;
-    		}
-    	}
+    	double isValidPr = getPrIsNotDistractor(model, verb, obj, prNGivenD, prD);
+    	gradedTestPoint.add(Pair.of(isValidPr, isPositiveGold));
+    	thresholdVals.add(isValidPr);
     	
     	line = testReader.readLine();
     }
-		System.out.printf("Processed all! , acc = %d/%d = %.6f, precision = %.6f, recall = %.6f, f1 = %.6f\n",
-		    result.tp + result.tn, lineCount, result.getAccuracy(), result.getPrecision(),
-		    result.getRecall(), result.getFscore());
-    
     testReader.close();
+    
+  	// Just doing a simple N^2 way instead of sort then linear scan since samples are small enough.
+		PrintWriter resultWriter = new PrintWriter(outputFile);
+		resultWriter.println("Threshold\tTP\tFP\tFN\tTN\tprecision\trecall\tfscore");
+		for(double threshold : thresholdVals) {
+			ClassificationPerformance result = new ClassificationPerformance();
+			for(Pair<Double, Boolean> point : gradedTestPoint) {
+				boolean predictIsPositive = point.getKey() > threshold;
+				boolean isPositive = point.getValue();
+				
+				if(isPositive) {
+					if(predictIsPositive) {
+						result.tp++;
+					} else {
+						result.fn++;
+					}
+				} else {
+					if(predictIsPositive) {
+						result.fp++;
+					} else {
+						result.tn++;
+					}
+				}
+			}
+			resultWriter.printf("%.6f\t%d\t%d\t%d\t%d\t%.6f\t%.6f\t%.6f\n", 
+					threshold, result.tp, result.fp, result.fn, result.tn, result.getPrecision(), result.getRecall(), result.getFscore());
+		}
+		resultWriter.close();
 	}
-	// The threshold value that optimizes f1 on the validation set
-	private static final double THRESHOLD =  0.212946;
-	private static boolean predictIsNotDistractor(LDAModel model, String verb, String obj, Map<String, Double> prNGivenD,
+	
+	private static double getPrIsNotDistractor(LDAModel model, String verb, String obj, Map<String, Double> prNGivenD,
 			double prD) {
 		double pLda = 0.0;
 		for(int topic = 0; topic < model.getTopicCount(); topic++) {
@@ -103,6 +127,6 @@ public class LDAEvaluationDriver {
 		double prN_D = prNGivenD.containsKey(obj) ? prNGivenD.get(obj) : 0.0;
 		double num = (1.0 - prD)  * pLda;
 		double den = prD * prN_D + num;
-		return num / den > THRESHOLD;
+		return num / den;
 	}
 }

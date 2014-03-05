@@ -18,20 +18,20 @@ public class SvmlightUtil {
 	/**
 	 * Run the trained model against a test set and report the performance
 	 */
-	public static ClassificationPerformance testModel(SVMLightModel model, LabeledFeatureVector[] testSet) {
+	public static ClassificationPerformance testModel(SVMLightModel model, LabeledFeatureVector[] testSet, double threshold) {
 		ClassificationPerformance result = new ClassificationPerformance();
 		for(LabeledFeatureVector testPoint : testSet) {
 			double prediction = model.classify(testPoint);
 			boolean isPositive = testPoint.getLabel() > 0;
 			
 			if(isPositive) {
-				if(prediction > 0) {
+				if(prediction > threshold) {
 					result.tp++;
 				} else {
 					result.fn++;
 				}
 			} else {
-				if(prediction > 0) {
+				if(prediction > threshold) {
 					result.fp++;
 				} else {
 					result.tn++;
@@ -39,6 +39,10 @@ public class SvmlightUtil {
 			}
 		}
 		return result;
+	}
+	
+	public static ClassificationPerformance testModel(SVMLightModel model, LabeledFeatureVector[] testSet) {
+		return testModel(model, testSet, 0.0);
 	}
 	
 	/**

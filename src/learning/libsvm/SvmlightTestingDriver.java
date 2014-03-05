@@ -19,12 +19,15 @@ public class SvmlightTestingDriver {
 	/** Names of the files that will be outputted in dir */
 	private static final String MODEL_FILENAME_TEMPLATE = "%s/model_%d.txt";
 
+	private static final String SEMANTIC = "semantic";
+	private static final String VERB = "verb";
+	private static final String VERB_AND_SEMANTIC = "verbAndSemantic";
 	public static void main(String[] args) throws Exception {
-		if (args.length != 5) {
+		if (args.length != 7) {
 			System.err
 			    .println("Usage: <path to stat> <path to test>" +
 			    		" <models dir - must be a folder, here all the models + mapping reside> "
-			    		 + " <wordnet path> <path to verb to test>");
+			    		 + " <wordnet path> <path to verb to test> <model type: semantic/verb/verbAndSemantic> <threshold: double>");
 			return;
 		}
 
@@ -33,6 +36,8 @@ public class SvmlightTestingDriver {
 		String modelDir = args[2];
 		String wordnetPath = args[3];
 		String verbToTestPath = args[4];
+		String modelType = args[5];
+		double threshold = Double.parseDouble(args[6]);
 		if (modelDir.endsWith("/")) {
 			modelDir = modelDir.substring(0, modelDir.length() - 1);
 		}
@@ -43,7 +48,17 @@ public class SvmlightTestingDriver {
 		System.out.println("Finished precomputation.");
 
 		WordnetCluster wordnet = new WordnetCluster(wordnetPath);
-	  FeatureExtractor featureExtractor = new SemanticFeatureExtractor(wordnet);
+	  FeatureExtractor featureExtractor = null;
+	  if(modelType.equals(SEMANTIC)) {
+	  	featureExtractor = new SemanticFeatureExtractor(wordnet);
+	  } else if(modelType.equals(VERB_AND_SEMANTIC)) {
+	  	featureExtractor = new VerbCooccurrenceAndSemanticFeatureExtractor(stats, wordnet);
+	  } else if(modelType.equals(VERB)) {
+	  	featureExtractor = new VerbCooccurrenceFeatureExtractor(stats);
+	  } else {
+	  	System.err.println("Unrecognized model type = " + modelType);
+	  	return;
+	  }
 		
 	  ClassificationPerformance globalResult = new ClassificationPerformance();
 
@@ -61,13 +76,13 @@ public class SvmlightTestingDriver {
 	  	}
 	  	
 			String file = String.format(MODEL_FILENAME_TEMPLATE, modelDir, verbId);
-			if(!new File(file).exists()) {
+			if(!new File(file).exists()) {	
 				System.err.println("No model for verbId = " + verbId + " = " + verbString + 
 						", even though there are test cases for it");
 				continue;
 			}
 			SVMLightModel model = SVMLightModel.readSVMLightModelFromURL(new URL("file:" + file));
-	  	ClassificationPerformance localResult = SvmlightUtil.testModel(model, testSet);
+	  	ClassificationPerformance localResult = SvmlightUtil.testModel(model, testSet, threshold);
 	  	
 	  	globalResult.merge(localResult);
 
@@ -85,7 +100,7 @@ public class SvmlightTestingDriver {
 	  }
 		
 		verbToTestReader.close();
-		System.out.printf("Processed all! , acc = %d/%d = %.2f, precision = %.2f, recall = %.2f, f1 = %.2f\n",
+		System.out.printf("Processed all! , acc = %d/%d = %.6f, precision = %.6f, recall = %.6f, f1 = %.6f\n",
 		    globalResult.tp + globalResult.tn, globalResult.getDatasetSize(), globalResult.getAccuracy(), globalResult.getPrecision(),
 		    globalResult.getRecall(), globalResult.getFscore());
 	}
