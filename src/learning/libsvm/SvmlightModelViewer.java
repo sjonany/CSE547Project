@@ -19,7 +19,7 @@ public class SvmlightModelViewer {
 	private static final String MODEL_FILENAME_TEMPLATE = "%s/model_%d.txt";
 	
 	// Top K most weighted features to show for each model
-	private static final int TOP_K = 5;
+	private static final int TOP_K = 20;
 	public static void main(String[] args) throws Exception {
 		if(args.length != 1) {
 			System.err.println("Usage: <models dir - must be a folder, here all the models + mapping reside>");
@@ -70,7 +70,14 @@ public class SvmlightModelViewer {
 			System.out.println(verbId + ". Model for verb = " + idToVerb.get(verbId));
 			for(int k = 1; k <= TOP_K; k++) {
 				int featIndex = indices.get(k);
-				System.out.printf("\t%d. %s : %.6f\n", k, idToVerb.get(featIndex), weights[featIndex]);
+				String featureName = "";
+				if(featIndex >= idToVerb.size() ) {
+					// zero based index of semantic feature
+					featureName = "Semantic_" + (featIndex - 1 - idToVerb.size());
+				} else {
+					featureName = idToVerb.get(featIndex);
+				}
+				System.out.printf("\t%d. %s : %.6f\n", k, featureName, weights[featIndex]);
 			}
 		}
 	}
