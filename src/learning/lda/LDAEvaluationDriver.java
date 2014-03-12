@@ -93,7 +93,7 @@ public class LDAEvaluationDriver {
     testReader.close();
 	}
 	// The threshold value that optimizes f1 on the validation set
-	private static final double THRESHOLD =  0.212946;
+	private static final double THRESHOLD = 0.000267;
 	private static boolean predictIsNotDistractor(LDAModel model, String verb, String obj, Map<String, Double> prNGivenD,
 			double prD) {
 		double pLda = 0.0;

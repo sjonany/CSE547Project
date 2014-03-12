@@ -14,8 +14,8 @@ public class VerbSelectionDriver {
 	
 	private static final int[] TOPICS = {8,9,27,40,43,48};
 	public static void main(String[] args) throws Exception {
-		String modelDir = "/Users/sjonany/NELResources/SelectionalPref/gibbsSampling/topic_300_model";
-		String vnIdxPath = "/Users/sjonany/NELResources/SelectionalPref/gibbsSampling/topic_300_model/vnIdx.txt";
+		String modelDir = "/Users/sjonany/NELResources/SelectionalPref/gibbsSampling/topic_300_maxF1Validation_model/";
+		String vnIdxPath = "/Users/sjonany/NELResources/SelectionalPref/gibbsSampling/topic_300_maxF1Validation_model/vnIdx.txt";
 		
 		// load relevant verbs
 		BufferedReader in = new BufferedReader(new FileReader(vnIdxPath));
