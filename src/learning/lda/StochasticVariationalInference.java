@@ -135,9 +135,12 @@ public class StochasticVariationalInference {
 		
 		// footnote of pg 26 of the svi paper
 		double avgNounPerVerb = 0.0;
+		int maxNounPerVerb = 0;
 		for(List<Integer> samples : dataset) {
 			avgNounPerVerb += samples.size();
+			maxNounPerVerb = Math.max(maxNounPerVerb, samples.size());
 		}
+		
 		ExponentialDistribution lambdaSampler = new ExponentialDistribution(
 				1.0 * numDistinctVerbs * avgNounPerVerb / NUM_TOPIC / N);
 		
@@ -148,8 +151,19 @@ public class StochasticVariationalInference {
 			}
 		}
 		
+		//maxNounPerVerb = 3,267,225
+		
 		// gamma_d_k is param for distribution of topic | document
 		double[][] gamma = new double[numDistinctVerbs][NUM_TOPIC];
+		
+		// initialize all the matrices here to save memory
+		double[][] digamma_lambda = new double[NUM_TOPIC][N];
+		double[] sum_digamma_lambda = new double[NUM_TOPIC];
+		double[][] phi = new double[maxNounPerVerb][NUM_TOPIC];
+		double[] digamma_gamma = new double[NUM_TOPIC];
+		double[][] tempPhi = new double[maxNounPerVerb][NUM_TOPIC];
+		double[] tempGammaD = new double[NUM_TOPIC];
+		double[] pows = new double[NUM_TOPIC];
 		
 		// repeat until forever, streaming data points
 		// for now, just round robin
@@ -165,8 +179,8 @@ public class StochasticVariationalInference {
 			}
 			
 			// precompute digamma of lambdas
-			double[][] digamma_lambda = new double[NUM_TOPIC][N];
-			double[] sum_digamma_lambda = new double[NUM_TOPIC];
+			clear(digamma_lambda);
+			Arrays.fill(sum_digamma_lambda, 0);
 			for(int k = 0; k < NUM_TOPIC; k++) {
 				for(int n = 0; n < N; n++) {
 					digamma_lambda[k][n] = digamma0(lambda[k][n]);
@@ -175,7 +189,7 @@ public class StochasticVariationalInference {
 			}
 			
 			// init phi_d - just used for storage
-			double[][] phi = new double[dataset[d].size()][NUM_TOPIC];
+			clear(phi);
 			
 			int numPhiGammaIter = 0;
 			// compute phi and gamma until convergence
@@ -183,7 +197,7 @@ public class StochasticVariationalInference {
 				double curTime = System.currentTimeMillis();
 				// precompute the digamma of gammas
 				//digamma_gamma[k] = digamma(gamma_d_k)
-				double[] digamma_gamma = new double[NUM_TOPIC];
+				Arrays.fill(digamma_gamma, 0);
 				// sum_j=1->K {digamma(gamma_d_j)}
 				double sum_digamma = 0.0;
 				for(int k = 0; k < NUM_TOPIC; k++) {
@@ -191,15 +205,14 @@ public class StochasticVariationalInference {
 					sum_digamma += digamma_gamma[k];
 				}
 				
-				double[][] tempPhi = new double[dataset[d].size()][NUM_TOPIC];
+				clear(tempPhi);
 			
 				// break the gamma_d = alpha + sum {phi_d_n}
-				double[] tempGammaD = new double[NUM_TOPIC];
 				Arrays.fill(tempGammaD, ALPHA);
 				for(int i = 0; i < dataset[d].size(); i++) {
 					int n = dataset[d].get(i);
 					// the E_log_theta + E_log_beta's, we can't just compute e ^ that for the phi's
-					double[] pows = new double[NUM_TOPIC];
+					Arrays.fill(pows, 0);
 					// compute and make sure sum {phi_dn} = 1
 					for(int k = 0; k < NUM_TOPIC; k++) {
 						double E_log_theta = digamma_gamma[k] - sum_digamma;
@@ -423,6 +436,12 @@ public class StochasticVariationalInference {
 		}
 		
 		return mode;
+	}
+	
+	public static void clear(double[][] mat) {
+		for(double[] arr : mat) {
+			Arrays.fill(arr, 0);
+		}
 	}
 }
 
