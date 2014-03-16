@@ -121,13 +121,12 @@ public class StochasticVariationalInference {
 		// Training
 		
 		final int NUM_TOPIC = 300;
-		final double STEP_SIZE = 0.001;
 		// page 35
 		final double ALPHA = 1.0 / NUM_TOPIC;
 		final double ETA = 0.01;
 		
 		final int D = numDistinctVerbs;
-		final int NUM_ROUNDS = 20;
+		final int NUM_ROUNDS = 100;
 		
 		final double PHI_CONVERGENCE = 0.01;
 		final double GAMMA_CONVERGENCE = 0.001;
@@ -136,15 +135,13 @@ public class StochasticVariationalInference {
 		double[][] lambda = new double[NUM_TOPIC][N];
 		
 		// footnote of pg 26 of the svi paper
-		double avgNounPerVerb = 0.0;
 		int maxNounPerVerb = 0;
 		for(List<Integer> samples : dataset) {
-			avgNounPerVerb += samples.size();
 			maxNounPerVerb = Math.max(maxNounPerVerb, samples.size());
 		}
 		
 		ExponentialDistribution lambdaSampler = new ExponentialDistribution(
-				1.0 * numDistinctVerbs * avgNounPerVerb / NUM_TOPIC / N);
+				1.0 * numDistinctVerbs * maxNounPerVerb / NUM_TOPIC / N);
 		
 		//Initialize lambda(t=0) randomly
 		for(int k = 0; k < NUM_TOPIC; k++) {
@@ -168,6 +165,9 @@ public class StochasticVariationalInference {
 		// repeat until forever, streaming data points
 		// for now, just round robin
 		for(int iter = 0; iter < NUM_ROUNDS * numDistinctVerbs; iter++) {
+			// page 1320 of http://jmlr.org/papers/volume14/hoffman13a/hoffman13a.pdf
+			double stepSize = Math.pow((iter + 1), -0.9);
+			
 			System.out.println("Starting sample " + iter);
 			// Get a document id from the dataset
 			int compactVerbId = iter % numDistinctVerbs;
@@ -279,7 +279,7 @@ public class StochasticVariationalInference {
 			// lambda_t = (1-p_t) * prev lambda + stuff ---- + stuff later
 			for(int k = 0; k < NUM_TOPIC; k++) {
 				for(int n = 0; n < N; n++) {
-					lambda[k][n] *= 1.0 - STEP_SIZE;
+					lambda[k][n] *= 1.0 - stepSize;
 				}
 				
 				// lambda_prime will already have sum {phi w} term from the very last iteration - when converged
@@ -291,7 +291,7 @@ public class StochasticVariationalInference {
 				
 				// merge lambda_prime
 				for(int n = 0; n < N; n++) {
-					lambda[k][n] += STEP_SIZE * lambda_prime[n];
+					lambda[k][n] += stepSize * lambda_prime[n];
 				}
 			} // done getting lambda(t)		
 			
@@ -300,7 +300,7 @@ public class StochasticVariationalInference {
 			// We have the free variables, but want to recover the parameters
 			// We just get the mode -- beta ~ Dir(alpha), just get the beta that maxes this prob
 			
-			if(iter > MIN_ITER_TO_TRACK) {
+			if(iter > MIN_ITER_TO_TRACK && (iter % 20 == 0 || iter % 20 == 1)) {
 				PrintWriter printWriter = new PrintWriter(baseDir + "betaAtIter" + iter + ".txt");
 			
 		    for (int t = 0; t < NUM_TOPIC; t++) {

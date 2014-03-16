@@ -14,8 +14,8 @@ public class VerbSelectionDriver {
 	
 	private static final int[] TOPICS = {8,9,27,40,43,48};
 	public static void main(String[] args) throws Exception {
-		String modelDir = "/Users/sjonany/NELResources/SelectionalPref/gibbsSampling/topic_300_maxF1Validation_model/";
-		String vnIdxPath = "/Users/sjonany/NELResources/SelectionalPref/gibbsSampling/topic_300_maxF1Validation_model/vnIdx.txt";
+		String modelDir = "/Users/sjonany/NELResources/SelectionalPref/sviLDA/";
+		String vnIdxPath = "/Users/sjonany/NELResources/SelectionalPref/sviLDA/vnIdx.txt";
 		
 		// load relevant verbs
 		BufferedReader in = new BufferedReader(new FileReader(vnIdxPath));
@@ -30,6 +30,7 @@ public class VerbSelectionDriver {
 		LDAModel model = LDAModel.loadModel(modelDir);
 		
 		int[] verbIdToBestTopicId = new int[model.getVerbCount()];
+		double[] maxProbs = new double[model.getVerbCount()];
 		for(int verbId : relevantVerbIds) {
 			double maxProb = -1;
 			int bestTopic = -1;
@@ -41,11 +42,13 @@ public class VerbSelectionDriver {
 				}
 			}
 			verbIdToBestTopicId[verbId] = bestTopic;
+			maxProbs[verbId] = maxProb;
 		}
 		
 		for(int verbId : relevantVerbIds) {
 			System.out.println("Verb = " + model.getVerb(verbId));
 			System.out.println("Best topic = " + verbIdToBestTopicId[verbId] +"\n");
+			System.out.println("Max Prob = " + maxProbs[verbId]);
 		}
 		
 		/*
