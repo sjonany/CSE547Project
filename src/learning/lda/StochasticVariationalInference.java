@@ -257,7 +257,7 @@ public class StochasticVariationalInference {
 				//double eucDistPhi = Math.sqrt(sqDiff(phi, tempPhi));
 
 				//if(numPhiGammaIter % 100 == 0) {
-					System.out.printf("Num Phi Gamma Iter = %d, eucDistGammaD = %.6f, eucDistPhi = %.6f\n, timeElapsed(s) = %.6f\n", 
+					System.out.printf("Num Phi Gamma Iter = %d, eucDistGammaD = %.6f, timeElapsed(s) = %.6f\n", 
 							numPhiGammaIter, eucDistGammaD, (System.currentTimeMillis() - curTime) / 1000.0);
 				//}
 					
