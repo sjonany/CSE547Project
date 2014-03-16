@@ -159,9 +159,7 @@ public class StochasticVariationalInference {
 		// initialize all the matrices here to save memory
 		double[][] digamma_lambda = new double[NUM_TOPIC][N];
 		double[] sum_digamma_lambda = new double[NUM_TOPIC];
-		double[][] phi = new double[maxNounPerVerb][NUM_TOPIC];
 		double[] digamma_gamma = new double[NUM_TOPIC];
-		double[][] tempPhi = new double[maxNounPerVerb][NUM_TOPIC];
 		double[] tempGammaD = new double[NUM_TOPIC];
 		double[] pows = new double[NUM_TOPIC];
 		
@@ -189,11 +187,16 @@ public class StochasticVariationalInference {
 			}
 			
 			// init phi_d - just used for storage
-			clear(phi);
 			
 			int numPhiGammaIter = 0;
+
+			// calculate lambda_prime -- need to do it on the fly if we don't want to save phi's
+			double[] lambda_prime = new double[N];
+			
 			// compute phi and gamma until convergence
 			while(true) {
+				Arrays.fill(lambda_prime, 0.0);
+				
 				double curTime = System.currentTimeMillis();
 				// precompute the digamma of gammas
 				//digamma_gamma[k] = digamma(gamma_d_k)
@@ -204,8 +207,6 @@ public class StochasticVariationalInference {
 					digamma_gamma[k] = digamma0(gamma[d][k]);
 					sum_digamma += digamma_gamma[k];
 				}
-				
-				clear(tempPhi);
 			
 				// break the gamma_d = alpha + sum {phi_d_n}
 				Arrays.fill(tempGammaD, ALPHA);
@@ -228,8 +229,14 @@ public class StochasticVariationalInference {
 					
 					//System.out.println("Log sum = " + logSum);
 					//new Scanner(System.in).nextLine();
+					// update gamma_d
 					for(int k = 0; k < NUM_TOPIC; k++) {
-						tempPhi[i][k] = Math.exp(pows[k] - logSum);
+						double phi_i_k = Math.exp(pows[k] - logSum);
+						tempGammaD[k] += phi_i_k;
+						
+						// Assume that this is the converging iteration
+						// if not converging iteration, lambda_prime gets reset to 0 anyways
+						lambda_prime[dataset[d].get(i)] += phi_i_k;
 						
 						// DEBUG
 						/*
@@ -240,11 +247,6 @@ public class StochasticVariationalInference {
 						}
 						System.out.println();*/
 					}
-					
-					// update gamma_d
-					for(int k = 0; k < NUM_TOPIC; k++) {
-						tempGammaD[k] += tempPhi[i][k];
-					}
 				}
 
 				//System.out.println("GammaD = " + Arrays.toString(tempGammaD));
@@ -252,15 +254,15 @@ public class StochasticVariationalInference {
 				
 				// check if phi_dn and gamma_d converge
 				double eucDistGammaD = Math.sqrt(sqDiff(gamma[d], tempGammaD));
-				double eucDistPhi = Math.sqrt(sqDiff(phi, tempPhi));
+				//double eucDistPhi = Math.sqrt(sqDiff(phi, tempPhi));
 
 				//if(numPhiGammaIter % 100 == 0) {
 					System.out.printf("Num Phi Gamma Iter = %d, eucDistGammaD = %.6f, eucDistPhi = %.6f\n, timeElapsed(s) = %.6f\n", 
-							numPhiGammaIter, eucDistGammaD, eucDistPhi, (System.currentTimeMillis() - curTime) / 1000.0);
+							numPhiGammaIter, eucDistGammaD, (System.currentTimeMillis() - curTime) / 1000.0);
 				//}
 					
 				if(numPhiGammaIter != 0) {
-					if(eucDistGammaD < GAMMA_CONVERGENCE && eucDistPhi < PHI_CONVERGENCE) {
+					if(eucDistGammaD < GAMMA_CONVERGENCE) {
 						break;
 					}
 				}
@@ -268,11 +270,7 @@ public class StochasticVariationalInference {
 				for(int i = 0; i < tempGammaD.length; i++) {
 					gamma[d][i] = tempGammaD[i];
 				}
-				for(int i = 0; i < phi.length; i++) {
-					for(int j = 0; j < phi[0].length;j++) {
-						phi[i][j] = tempPhi[i][j];
-					}
-				}
+				
 				numPhiGammaIter++;
 			}// got phi and gamma
 			
@@ -282,12 +280,7 @@ public class StochasticVariationalInference {
 					lambda[k][n] *= 1.0 - STEP_SIZE;
 				}
 				
-				// calculate lambda_prime
-				double[] lambda_prime = new double[N];
-				
-				for(int i = 0; i < dataset[d].size(); i++) {
-					lambda_prime[dataset[d].get(i)] += phi[i][k];
-				}
+				// lambda_prime will already have sum {phi w} term from the very last iteration - when converged
 				
 				for(int n = 0; n < N; n++) {
 					lambda_prime[n] *= D;
