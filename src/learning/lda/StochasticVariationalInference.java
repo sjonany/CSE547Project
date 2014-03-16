@@ -11,13 +11,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Scanner;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math3.distribution.ExponentialDistribution;
 
 public class StochasticVariationalInference {
 	
+	// how many iterations til i start keeping a log of the params
+	private static final int MIN_ITER_TO_TRACK = 100;
+
 	// Using the notations from Figure 6 of http://arxiv.org/pdf/1206.7051v3.pdf
 	public static void main(String[] args) throws Exception {
 		String baseDir = args[0];
@@ -125,7 +127,7 @@ public class StochasticVariationalInference {
 		final double ETA = 0.01;
 		
 		final int D = numDistinctVerbs;
-		final int NUM_ROUNDS = 5;
+		final int NUM_ROUNDS = 20;
 		
 		final double PHI_CONVERGENCE = 0.01;
 		final double GAMMA_CONVERGENCE = 0.001;
@@ -297,42 +299,45 @@ public class StochasticVariationalInference {
 
 			// We have the free variables, but want to recover the parameters
 			// We just get the mode -- beta ~ Dir(alpha), just get the beta that maxes this prob
-			PrintWriter printWriter = new PrintWriter(baseDir + "betaAtIter" + iter + ".txt");
-		
-	    for (int t = 0; t < NUM_TOPIC; t++) {
-	    	double[] beta_t = getDirichletMode(lambda[t]);
-	      for (int n = 0; n < N; n++) {
-	        printWriter.print(beta_t[n]);
-	        if (n < N-1) {
-	        	printWriter.print("\t");
-	        } else {
-	        	printWriter.println();
-	        }
-	      }
-	    }
-	    
-	    printWriter.close();
-
-	    printWriter = new PrintWriter(baseDir + "thetaAtIter" + iter + ".txt");
-	    for (int v = 0; v < V; v++) {
-	    	double[] theta_v = new double[NUM_TOPIC];
-      	//for verbs we don't care about, just put whatever.
-	    	Arrays.fill(theta_v, -1234.0);
-      	if(textIdToCompactId.containsKey(v)) {
-      		theta_v = getDirichletMode(gamma[textIdToCompactId.get(v)]);
-      	}
-      	
-	      for (int t = 0; t < NUM_TOPIC; t++) {
-	        printWriter.print(theta_v[t]);
-	        if (t < NUM_TOPIC-1) {
-	        	printWriter.print("\t");
-	        } else {
-	        	printWriter.println();
-	        }
-	      }
-	    }
-	    
-	    printWriter.close();
+			
+			if(iter > MIN_ITER_TO_TRACK) {
+				PrintWriter printWriter = new PrintWriter(baseDir + "betaAtIter" + iter + ".txt");
+			
+		    for (int t = 0; t < NUM_TOPIC; t++) {
+		    	double[] beta_t = getDirichletMode(lambda[t]);
+		      for (int n = 0; n < N; n++) {
+		        printWriter.print(beta_t[n]);
+		        if (n < N-1) {
+		        	printWriter.print("\t");
+		        } else {
+		        	printWriter.println();
+		        }
+		      }
+		    }
+		    
+		    printWriter.close();
+	
+		    printWriter = new PrintWriter(baseDir + "thetaAtIter" + iter + ".txt");
+		    for (int v = 0; v < V; v++) {
+		    	double[] theta_v = new double[NUM_TOPIC];
+	      	//for verbs we don't care about, just put whatever.
+		    	Arrays.fill(theta_v, -1234.0);
+	      	if(textIdToCompactId.containsKey(v)) {
+	      		theta_v = getDirichletMode(gamma[textIdToCompactId.get(v)]);
+	      	}
+	      	
+		      for (int t = 0; t < NUM_TOPIC; t++) {
+		        printWriter.print(theta_v[t]);
+		        if (t < NUM_TOPIC-1) {
+		        	printWriter.print("\t");
+		        } else {
+		        	printWriter.println();
+		        }
+		      }
+		    }
+		    
+		    printWriter.close();
+			}
 		} // for each data point = document    
 	}//end main
 	
