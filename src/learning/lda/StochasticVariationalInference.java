@@ -6,11 +6,14 @@ import java.io.PrintWriter;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Scanner;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math3.distribution.ExponentialDistribution;
 
 public class StochasticVariationalInference {
@@ -66,8 +69,8 @@ public class StochasticVariationalInference {
 		int numDistinctVerbs = 0;
 		while(line != null) {
 			String[] vnPair = line.split(",");
-			int vid = Integer.parseInt(vnPair[0]);
-			int nid = Integer.parseInt(vnPair[1]);
+			int vid = Integer.parseInt(vnPair[0])-1;
+			int nid = Integer.parseInt(vnPair[1])-1;
 			
 			if(!textIdToCompactId.containsKey(vid)) {
 				int compactId = textIdToCompactId.size();
@@ -104,15 +107,23 @@ public class StochasticVariationalInference {
 			dataset[compactId].add(nid);
 			line = vnReader.readLine();
 		}
+		
+		// randomize the order of words
+		for(List samples : dataset) {
+			Collections.shuffle(samples);
+		}
+		
 		System.out.println("Finished preprocessing training data...");
 
 		////////////////////////////////////////////////////
 		// Training
-	
+		
 		final int NUM_TOPIC = 300;
 		final double STEP_SIZE = 0.001;
-		final double ALPHA = 50.0 / NUM_TOPIC;
+		// page 35
+		final double ALPHA = 1.0 / NUM_TOPIC;
 		final double ETA = 0.01;
+		
 		final int D = numDistinctVerbs;
 		final int NUM_ROUNDS = 5;
 		
@@ -169,6 +180,7 @@ public class StochasticVariationalInference {
 			int numPhiGammaIter = 0;
 			// compute phi and gamma until convergence
 			while(true) {
+				double curTime = System.currentTimeMillis();
 				// precompute the digamma of gammas
 				//digamma_gamma[k] = digamma(gamma_d_k)
 				double[] digamma_gamma = new double[NUM_TOPIC];
@@ -194,12 +206,26 @@ public class StochasticVariationalInference {
 						double E_log_beta = digamma_lambda[k][n] - sum_digamma_lambda[k];
 						pows[k] = E_log_theta + E_log_beta;
 					}
-
+					
+					//System.out.println("Pows max = " + maxArr(pows) + " , min = " + minArr(pows));
+					
 					// need to compute e^x1 / sum {e^xi}
 					// can't, so we compute instead log of that = x1 - log(sum{e^xi}), then e^that
 					double logSum = logSumExp(pows);
+					
+					//System.out.println("Log sum = " + logSum);
+					//new Scanner(System.in).nextLine();
 					for(int k = 0; k < NUM_TOPIC; k++) {
 						tempPhi[i][k] = Math.exp(pows[k] - logSum);
+						
+						// DEBUG
+						/*
+						for(int j = 0; j < tempPhi[i].length; j++) {
+							if(tempPhi[i][j] != 0) {
+								System.out.print(j + " -> " + tempPhi[i][j] + " | ");
+							}
+						}
+						System.out.println();*/
 					}
 					
 					// update gamma_d
@@ -208,22 +234,33 @@ public class StochasticVariationalInference {
 					}
 				}
 
+				//System.out.println("GammaD = " + Arrays.toString(tempGammaD));
+				//System.out.println("Phi = " + Arrays.deepToString(tempPhi));
+				
 				// check if phi_dn and gamma_d converge
 				double eucDistGammaD = Math.sqrt(sqDiff(gamma[d], tempGammaD));
 				double eucDistPhi = Math.sqrt(sqDiff(phi, tempPhi));
+
+				//if(numPhiGammaIter % 100 == 0) {
+					System.out.printf("Num Phi Gamma Iter = %d, eucDistGammaD = %.6f, eucDistPhi = %.6f\n, timeElapsed(s) = %.6f\n", 
+							numPhiGammaIter, eucDistGammaD, eucDistPhi, (System.currentTimeMillis() - curTime) / 1000.0);
+				//}
+					
 				if(numPhiGammaIter != 0) {
 					if(eucDistGammaD < GAMMA_CONVERGENCE && eucDistPhi < PHI_CONVERGENCE) {
 						break;
 					}
 				}
 				
-				gamma[d] = tempGammaD;
-				phi = tempPhi;
+				for(int i = 0; i < tempGammaD.length; i++) {
+					gamma[d][i] = tempGammaD[i];
+				}
+				for(int i = 0; i < phi.length; i++) {
+					for(int j = 0; j < phi[0].length;j++) {
+						phi[i][j] = tempPhi[i][j];
+					}
+				}
 				numPhiGammaIter++;
-				//if(numPhiGammaIter % 100 == 0) {
-					System.out.printf("Num Phi Gamma Iter = %d, eucDistGammaD = %.6f, eucDistPhi = %.6f\n", 
-							numPhiGammaIter, eucDistGammaD, eucDistPhi);
-				//}
 			}// got phi and gamma
 			
 			// lambda_t = (1-p_t) * prev lambda + stuff ---- + stuff later
@@ -248,14 +285,18 @@ public class StochasticVariationalInference {
 				for(int n = 0; n < N; n++) {
 					lambda[k][n] += STEP_SIZE * lambda_prime[n];
 				}
-			} // done getting lambda(t)
-		  
+			} // done getting lambda(t)		
+			
 			// store params
+
+			// We have the free variables, but want to recover the parameters
+			// We just get the mode -- beta ~ Dir(alpha), just get the beta that maxes this prob
 			PrintWriter printWriter = new PrintWriter(baseDir + "betaAtIter" + iter + ".txt");
 		
 	    for (int t = 0; t < NUM_TOPIC; t++) {
+	    	double[] beta_t = getDirichletMode(lambda[t]);
 	      for (int n = 0; n < N; n++) {
-	        printWriter.print(lambda[t][n]);
+	        printWriter.print(beta_t[n]);
 	        if (n < N-1) {
 	        	printWriter.print("\t");
 	        } else {
@@ -268,13 +309,15 @@ public class StochasticVariationalInference {
 
 	    printWriter = new PrintWriter(baseDir + "thetaAtIter" + iter + ".txt");
 	    for (int v = 0; v < V; v++) {
+	    	double[] theta_v = new double[NUM_TOPIC];
+      	//for verbs we don't care about, just put whatever.
+	    	Arrays.fill(theta_v, -1234.0);
+      	if(textIdToCompactId.containsKey(v)) {
+      		theta_v = getDirichletMode(gamma[textIdToCompactId.get(v)]);
+      	}
+      	
 	      for (int t = 0; t < NUM_TOPIC; t++) {
-	      	//for verbs we don't care about, just put whatever.
-	      	double theta_v_t = -1234.0;
-	      	if(textIdToCompactId.containsKey(v)) {
-	      		theta_v_t = gamma[textIdToCompactId.get(v)][t];
-	      	}
-	        printWriter.print(theta_v_t);
+	        printWriter.print(theta_v[t]);
 	        if (t < NUM_TOPIC-1) {
 	        	printWriter.print("\t");
 	        } else {
@@ -333,15 +376,53 @@ public class StochasticVariationalInference {
 	
 	// approx log {sum e^ki}
 	public static double logSumExp(double[] pows){
-		double max = Double.NEGATIVE_INFINITY;
-		for(double p : pows) {
-			max = Math.max(max, p);
-		}
+		double max = maxArr(pows).getRight();
 		double sum = 0.0;
 		for(double p : pows) {
 			sum += Math.exp(p - max);
 		}
 		return max + Math.log(sum);
+	}
+	
+	public static Pair<Integer, Double> minArr(double[] arr) {
+		double min = Double.POSITIVE_INFINITY;
+		int minIndex = -1;
+		for(int i = 0; i < arr.length; i++) {
+			if(min > arr[i]) {
+				min = arr[i];
+				minIndex = i;
+			}
+		}
+		return Pair.of(minIndex, min);
+	}
+	
+
+	public static Pair<Integer, Double> maxArr(double[] arr) {
+		double max = Double.NEGATIVE_INFINITY;
+		int maxIndex = -1;
+		for(int i = 0; i < arr.length; i++) {
+			if(max < arr[i]) {
+				max = arr[i];
+				maxIndex = i;
+			}
+		}
+		return Pair.of(maxIndex, max);
+	}
+	
+	// see "mode" from http://en.wikipedia.org/wiki/Dirichlet_distribution
+	public static double[] getDirichletMode(double[] dirParams) {
+		double sum = 0.0;
+		int K = dirParams.length;
+		for(double x : dirParams) {
+			sum += x;
+		}
+		
+		double[] mode = new double[K];
+		for(int i = 0; i < K; i++) {
+			mode[i] = (dirParams[i] - 1.0) / (sum - K); 
+		}
+		
+		return mode;
 	}
 }
 
