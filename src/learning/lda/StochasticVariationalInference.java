@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.math3.special.Gamma;
+import org.apache.commons.math3.distribution.ExponentialDistribution;
 
 public class StochasticVariationalInference {
 	
@@ -96,8 +96,9 @@ public class StochasticVariationalInference {
 		line = vnReader.readLine();
 		while(line != null) {
 			String[] vnPair = line.split(",");
-			int vid = Integer.parseInt(vnPair[0]);
-			int nid = Integer.parseInt(vnPair[1]);
+			// The indices are one-based. I want zero-based
+			int vid = Integer.parseInt(vnPair[0])-1;
+			int nid = Integer.parseInt(vnPair[1])-1;
 			
 			int compactId = textIdToCompactId.get(vid);
 			dataset[compactId].add(nid);
@@ -107,11 +108,9 @@ public class StochasticVariationalInference {
 
 		////////////////////////////////////////////////////
 		// Training
-		
-
+	
 		final int NUM_TOPIC = 300;
 		final double STEP_SIZE = 0.001;
-		final double LAMBDA_MAGNITUDE = 1.0;
 		final double ALPHA = 50.0 / NUM_TOPIC;
 		final double ETA = 0.01;
 		final int D = numDistinctVerbs;
@@ -122,11 +121,19 @@ public class StochasticVariationalInference {
 		
 		//lambda is param for distribution of objects/noun | topic
 		double[][] lambda = new double[NUM_TOPIC][N];
-	
+		
+		// footnote of pg 26 of the svi paper
+		double avgNounPerVerb = 0.0;
+		for(List<Integer> samples : dataset) {
+			avgNounPerVerb += samples.size();
+		}
+		ExponentialDistribution lambdaSampler = new ExponentialDistribution(
+				1.0 * numDistinctVerbs * avgNounPerVerb / NUM_TOPIC / N);
+		
 		//Initialize lambda(t=0) randomly
 		for(int k = 0; k < NUM_TOPIC; k++) {
 			for(int n = 0; n < N; n++) {
-				lambda[k][n] = Math.random() * LAMBDA_MAGNITUDE;
+				lambda[k][n] = lambdaSampler.sample();
 			}
 		}
 		
@@ -136,6 +143,7 @@ public class StochasticVariationalInference {
 		// repeat until forever, streaming data points
 		// for now, just round robin
 		for(int iter = 0; iter < NUM_ROUNDS * numDistinctVerbs; iter++) {
+			System.out.println("Starting sample " + iter);
 			// Get a document id from the dataset
 			int compactVerbId = iter % numDistinctVerbs;
 			int d = compactVerbId;
@@ -150,7 +158,7 @@ public class StochasticVariationalInference {
 			double[] sum_digamma_lambda = new double[NUM_TOPIC];
 			for(int k = 0; k < NUM_TOPIC; k++) {
 				for(int n = 0; n < N; n++) {
-					digamma_lambda[k][n] = Gamma.digamma(lambda[k][n]);
+					digamma_lambda[k][n] = digamma0(lambda[k][n]);
 					sum_digamma_lambda[k] += digamma_lambda[k][n];
 				}
 			}
@@ -167,7 +175,7 @@ public class StochasticVariationalInference {
 				// sum_j=1->K {digamma(gamma_d_j)}
 				double sum_digamma = 0.0;
 				for(int k = 0; k < NUM_TOPIC; k++) {
-					digamma_gamma[k] = Gamma.digamma(gamma[d][k]);
+					digamma_gamma[k] = digamma0(gamma[d][k]);
 					sum_digamma += digamma_gamma[k];
 				}
 				
@@ -178,21 +186,20 @@ public class StochasticVariationalInference {
 				Arrays.fill(tempGammaD, ALPHA);
 				for(int i = 0; i < dataset[d].size(); i++) {
 					int n = dataset[d].get(i);
+					// the E_log_theta + E_log_beta's, we can't just compute e ^ that for the phi's
+					double[] pows = new double[NUM_TOPIC];
 					// compute and make sure sum {phi_dn} = 1
 					for(int k = 0; k < NUM_TOPIC; k++) {
 						double E_log_theta = digamma_gamma[k] - sum_digamma;
 						double E_log_beta = digamma_lambda[k][n] - sum_digamma_lambda[k];
-						tempPhi[i][k] = Math.exp(E_log_theta + E_log_beta);
+						pows[k] = E_log_theta + E_log_beta;
 					}
-					
-					// normalize phi's
-					double normalizer = 0.0;
+
+					// need to compute e^x1 / sum {e^xi}
+					// can't, so we compute instead log of that = x1 - log(sum{e^xi}), then e^that
+					double logSum = logSumExp(pows);
 					for(int k = 0; k < NUM_TOPIC; k++) {
-						normalizer += tempPhi[i][k];
-					}
-					
-					for(int k = 0; k < NUM_TOPIC; k++) {
-						tempPhi[i][k] /= normalizer;
+						tempPhi[i][k] = Math.exp(pows[k] - logSum);
 					}
 					
 					// update gamma_d
@@ -213,10 +220,10 @@ public class StochasticVariationalInference {
 				gamma[d] = tempGammaD;
 				phi = tempPhi;
 				numPhiGammaIter++;
-				if(numPhiGammaIter % 100 == 0) {
+				//if(numPhiGammaIter % 100 == 0) {
 					System.out.printf("Num Phi Gamma Iter = %d, eucDistGammaD = %.6f, eucDistPhi = %.6f\n", 
 							numPhiGammaIter, eucDistGammaD, eucDistPhi);
-				}
+				//}
 			}// got phi and gamma
 			
 			// lambda_t = (1-p_t) * prev lambda + stuff ---- + stuff later
@@ -306,5 +313,35 @@ public class StochasticVariationalInference {
 		return sum;
 	}
 	
+	// Non-recursive digamma stolen from https://code.google.com/p/xieboyi/source/browse/trunk/Ilda/src/org/knowceans/util/Gamma.java?r=247
+	// Written by Gregor Heinrich
+	public static double digamma0(double x) {
+		//double input = x;
+		
+    double p;
+    assert x > 0 : "digamma(" + x + ")";
+    x = x + 6;
+    p = 1 / (x * x);
+    p = (((0.004166666666667 * p - 0.003968253986254) * p + 0.008333333333333)
+                    * p - 0.083333333333333)
+                    * p;
+    p = p + Math.log(x) - 0.5 / x - 1 / (x - 1) - 1 / (x - 2) - 1 / (x - 3) - 1
+                    / (x - 4) - 1 / (x - 5) - 1 / (x - 6);
+    //System.out.println("Digamma of " + input + " = " + p);
+    return p;
+	}
+	
+	// approx log {sum e^ki}
+	public static double logSumExp(double[] pows){
+		double max = Double.NEGATIVE_INFINITY;
+		for(double p : pows) {
+			max = Math.max(max, p);
+		}
+		double sum = 0.0;
+		for(double p : pows) {
+			sum += Math.exp(p - max);
+		}
+		return max + Math.log(sum);
+	}
 }
 
