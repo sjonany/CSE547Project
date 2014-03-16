@@ -1,10 +1,12 @@
-package util;
+package learning.lda;
 
 import java.io.*;
 import java.util.*;
 
+import util.StatUtil;
 
-public class MCMC {
+
+public class CollapsedGibbsSampler {
 	/**
 	 * @param args
 	 * @throws IOException 
