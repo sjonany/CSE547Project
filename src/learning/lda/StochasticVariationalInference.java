@@ -135,16 +135,12 @@ public class StochasticVariationalInference {
 		final int D = numDistinctVerbs;
 		final int NUM_ROUNDS = 1000;
 		
-		final double PHI_CONVERGENCE = 0.01;
-		final double GAMMA_CONVERGENCE = 0.001;
+		final double GAMMA_CONVERGENCE = 0.01 * NUM_TOPIC;
+		final int MAX_CONVERGENCE_ITER = 100;
 		
 		//lambda is param for distribution of objects/noun | topic
 		double[][] lambda = new double[NUM_TOPIC][N];
 
-		// footnote of pg 26 of the svi paper
-		double expParam = 3.0;//(1.0 * numDistinctVerbs * maxNounPerVerb / NUM_TOPIC / N);
-		double expMean = 1.0 / expParam;
-		System.out.println("exp param = " + expParam);
 		GammaDistribution lambdaSampler = new GammaDistribution(100.0, 0.01);
 		
 		//Initialize lambda(t=0) randomly
@@ -170,7 +166,7 @@ public class StochasticVariationalInference {
 		// for now, just round robin
 		for(int iter = 0; iter < NUM_ROUNDS * numDistinctVerbs; iter++) {
 			// page 1320 of http://jmlr.org/papers/volume14/hoffman13a/hoffman13a.pdf
-			double stepSize = Math.pow((iter + 2), -0.7);
+			double stepSize = Math.pow((iter + 1), -0.7);
 			
 			System.out.println("Starting sample " + iter);
 			// Get a document id from the dataset
@@ -189,29 +185,31 @@ public class StochasticVariationalInference {
 			for(int k = 0; k < NUM_TOPIC; k++) {
 				for(int n = 0; n < N; n++) {
 					digamma_lambda[k][n] = digamma0(lambda[k][n]);
-					sum_digamma_lambda[k] += digamma_lambda[k][n];
+					sum_digamma_lambda[k] += lambda[k][n];
 				}
+				sum_digamma_lambda[k] = digamma0(sum_digamma_lambda[k]);
 			}
 		
 			int numPhiGammaIter = 0;
 
 			// calculate lambda_prime -- need to do it on the fly if we don't want to save phi's
-			double[] lambda_prime = new double[N];
+			double[][] lambda_prime = new double[NUM_TOPIC][N];
 			
 			// compute phi and gamma until convergence
 			while(true) {
-				Arrays.fill(lambda_prime, 0.0);
+				clear(lambda_prime);
 				
 				double curTime = System.currentTimeMillis();
 				// precompute the digamma of gammas
 				//digamma_gamma[k] = digamma(gamma_d_k)
 				Arrays.fill(digamma_gamma, 0);
-				// sum_j=1->K {digamma(gamma_d_j)}
+				// digamma(sum_j=1->K {gamma_d_j})
 				double sum_digamma = 0.0;
 				for(int k = 0; k < NUM_TOPIC; k++) {
 					digamma_gamma[k] = digamma0(gamma[d][k]);
-					sum_digamma += digamma_gamma[k];
+					sum_digamma += gamma[d][k];
 				}
+				sum_digamma = digamma0(sum_digamma);
 			
 				// break the gamma_d = alpha + sum {phi_d_n}
 				Arrays.fill(tempGammaD, ALPHA);
@@ -226,34 +224,24 @@ public class StochasticVariationalInference {
 					for(int k = 0; k < NUM_TOPIC; k++) {
 						double E_log_theta = digamma_gamma[k] - sum_digamma;
 						double E_log_beta = digamma_lambda[k][noun] - sum_digamma_lambda[k];
-						pows[k] = E_log_theta + E_log_beta;
+						pows[k] = Math.exp(E_log_theta + E_log_beta);
 						// System.out.println("Stub");
 					}
 					
-					//System.out.println("Pows max = " + maxArr(pows) + " , min = " + minArr(pows));
-					
-					// need to compute e^x1 / sum {e^xi}
-					// can't, so we compute instead log of that = x1 - log(sum{e^xi}), then e^that
-					double logSum = logSumExp(pows);
+					double normalizer = 0.0;
+					for(double p : pows) {
+						normalizer += p;
+					}
 					
 					// update gamma_d
 					for(int k = 0; k < NUM_TOPIC; k++) {
 						// Can collapse identical words in the document together, since the math form is exactly the same
-						double phi_i_k = Math.exp(pows[k] - logSum);
+						double phi_i_k = pows[k] / normalizer;
 						tempGammaD[k] += freq * phi_i_k;
 						
 						// Assume that this is the converging iteration
 						// if not converging iteration, lambda_prime gets reset to 0 anyways
-						lambda_prime[noun] +=  freq * phi_i_k;
-						
-						// DEBUG
-						/*
-						for(int j = 0; j < tempPhi[i].length; j++) {
-							if(tempPhi[i][j] != 0) {
-								System.out.print(j + " -> " + tempPhi[i][j] + " | ");
-							}
-						}
-						System.out.println();*/
+						lambda_prime[k][noun] +=  freq * phi_i_k;
 					}
 				}
 
@@ -270,7 +258,7 @@ public class StochasticVariationalInference {
 				//}
 					
 				if(numPhiGammaIter != 0) {
-					if(eucDistGammaD < GAMMA_CONVERGENCE) {
+					if(eucDistGammaD < GAMMA_CONVERGENCE || numPhiGammaIter > MAX_CONVERGENCE_ITER) {
 						break;
 					}
 				}
@@ -293,13 +281,13 @@ public class StochasticVariationalInference {
 				// lambda_prime will already have sum {phi w} term from the very last iteration - when converged
 				
 				for(int n = 0; n < N; n++) {
-					lambda_prime[n] *= D;
-					lambda_prime[n] += ETA;
+					lambda_prime[k][n] *= D;
+					lambda_prime[k][n] += ETA;
 				}
 				
 				// merge lambda_prime
 				for(int n = 0; n < N; n++) {
-					lambda[k][n] += stepSize * lambda_prime[n];
+					lambda[k][n] += stepSize * lambda_prime[k][n];
 				}
 			} // done getting lambda(t)		
 			
@@ -307,21 +295,6 @@ public class StochasticVariationalInference {
 
 			// We have the free variables, but want to recover the parameters
 			// We just get the mode -- beta ~ Dir(alpha), just get the beta that maxes this prob
-			
-			System.out.println("Gammas:");
-			for(int v = 0; v < numDistinctVerbs; v++) {
-				System.out.print(v + " - " + compactIdToTextId[v] + ": ");
-				System.out.println(compress(gamma[v]));
-		    for (int t = 0; t < NUM_TOPIC; t++) {
-		    	 System.out.print(gamma[v][t]);
-		       if (t < NUM_TOPIC-1) {
-		      	 System.out.print("\t");
-		       } else {
-		      	 System.out.println();
-		       }
-		    }
-			}
-			System.out.flush();
 			
 			// logging
 			if(iter > MIN_ITER_TO_TRACK && (iter % 10 == 0 || iter % 10 == 1)) {	
