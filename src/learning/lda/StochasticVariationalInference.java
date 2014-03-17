@@ -6,7 +6,6 @@ import java.io.PrintWriter;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,13 +89,8 @@ public class StochasticVariationalInference {
 		for(Entry<Integer, Integer> entry : textIdToCompactId.entrySet()) {
 			compactIdToTextId[entry.getValue()] = entry.getKey();
 		}
-		
-		// dataset[i] = the dataset for verb with compact id i
-		// dataset is a list of nouns n such that (v,n) appeared in corpus
-		List<Integer>[] dataset = (List<Integer>[]) Array.newInstance(List.class, numDistinctVerbs);
-		for(int i = 0; i < dataset.length; i++) {
-			dataset[i] = new ArrayList<Integer>();
-		}
+		// count of (v,n) in the corpus
+		Map<Pair<Integer, Integer>, Integer> vnCount = new HashMap<Pair<Integer, Integer>, Integer>();
 		
 		vnReader.close();
 		vnReader = new BufferedReader(new FileReader(baseDir + "vnIdxSmall.txt"));
@@ -108,15 +102,26 @@ public class StochasticVariationalInference {
 			int nid = Integer.parseInt(vnPair[1])-1;
 			
 			int compactId = textIdToCompactId.get(vid);
-			dataset[compactId].add(nid);
+			Pair p = Pair.of(compactId, nid);
+			StatUtil.addToTally(vnCount, p, 1);
 			line = vnReader.readLine();
 		}
 		
-		// randomize the order of words
-		for(List samples : dataset) {
-			Collections.shuffle(samples);
+		// compressedDataset[i] contains samples for document (verb) i
+		// each sample is a <nounId, frequency> pair
+		List<Pair<Integer, Integer>>[] compressedDataset = 
+				(List<Pair<Integer, Integer>>[]) Array.newInstance(List.class, numDistinctVerbs);;
+		
+		for(int i = 0; i < compressedDataset.length; i++) {
+			compressedDataset[i] = new ArrayList();
 		}
 		
+		for(Pair<Integer, Integer> vn : vnCount.keySet()) {
+			int v = vn.getKey();
+			int n = vn.getValue();
+			int freq = vnCount.get(vn);
+			compressedDataset[v].add(Pair.of(n, freq));
+		}
 		System.out.println("Finished preprocessing training data...");
 
 		////////////////////////////////////////////////////
@@ -135,15 +140,6 @@ public class StochasticVariationalInference {
 		
 		//lambda is param for distribution of objects/noun | topic
 		double[][] lambda = new double[NUM_TOPIC][N];
-		
-		
-		int maxNounPerVerb = 0;
-		int totSamples = 0;
-		for(List<Integer> samples : dataset) {
-			maxNounPerVerb = Math.max(maxNounPerVerb, samples.size());
-			totSamples += samples.size();
-		}
-		System.out.println("Total samples = " + totSamples);
 
 		// footnote of pg 26 of the svi paper
 		double expParam = 3.0;//(1.0 * numDistinctVerbs * maxNounPerVerb / NUM_TOPIC / N);
@@ -174,7 +170,7 @@ public class StochasticVariationalInference {
 		// for now, just round robin
 		for(int iter = 0; iter < NUM_ROUNDS * numDistinctVerbs; iter++) {
 			// page 1320 of http://jmlr.org/papers/volume14/hoffman13a/hoffman13a.pdf
-			double stepSize = Math.pow((iter + 2), -0.5);
+			double stepSize = Math.pow((iter + 2), -0.7);
 			
 			System.out.println("Starting sample " + iter);
 			// Get a document id from the dataset
@@ -196,9 +192,7 @@ public class StochasticVariationalInference {
 					sum_digamma_lambda[k] += digamma_lambda[k][n];
 				}
 			}
-			
-			// init phi_d - just used for storage
-			
+		
 			int numPhiGammaIter = 0;
 
 			// calculate lambda_prime -- need to do it on the fly if we don't want to save phi's
@@ -221,14 +215,17 @@ public class StochasticVariationalInference {
 			
 				// break the gamma_d = alpha + sum {phi_d_n}
 				Arrays.fill(tempGammaD, ALPHA);
-				for(int i = 0; i < dataset[d].size(); i++) {
-					int n = dataset[d].get(i);
+				for(int i = 0; i < compressedDataset[d].size(); i++) {
+					Pair<Integer, Integer> nFreq = compressedDataset[d].get(i);
+					int noun = nFreq.getKey();
+					int freq = nFreq.getValue();
+					
 					// the E_log_theta + E_log_beta's, we can't just compute e ^ that for the phi's
 					Arrays.fill(pows, 0);
 					// compute and make sure sum {phi_dn} = 1
 					for(int k = 0; k < NUM_TOPIC; k++) {
 						double E_log_theta = digamma_gamma[k] - sum_digamma;
-						double E_log_beta = digamma_lambda[k][n] - sum_digamma_lambda[k];
+						double E_log_beta = digamma_lambda[k][noun] - sum_digamma_lambda[k];
 						pows[k] = E_log_theta + E_log_beta;
 						// System.out.println("Stub");
 					}
@@ -239,17 +236,15 @@ public class StochasticVariationalInference {
 					// can't, so we compute instead log of that = x1 - log(sum{e^xi}), then e^that
 					double logSum = logSumExp(pows);
 					
-					//System.out.println("Log sum = " + logSum);
-					//new Scanner(System.in).nextLine();
 					// update gamma_d
 					for(int k = 0; k < NUM_TOPIC; k++) {
+						// Can collapse identical words in the document together, since the math form is exactly the same
 						double phi_i_k = Math.exp(pows[k] - logSum);
-						//System.out.println(k + " -> " + phi_i_k);
-						tempGammaD[k] += phi_i_k;
+						tempGammaD[k] += freq * phi_i_k;
 						
 						// Assume that this is the converging iteration
 						// if not converging iteration, lambda_prime gets reset to 0 anyways
-						lambda_prime[dataset[d].get(i)] += phi_i_k;
+						lambda_prime[noun] +=  freq * phi_i_k;
 						
 						// DEBUG
 						/*
