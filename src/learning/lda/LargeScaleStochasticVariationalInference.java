@@ -11,8 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.math3.distribution.GammaDistribution;
@@ -28,12 +26,6 @@ public class LargeScaleStochasticVariationalInference {
 	// how many iterations til i start keeping a log of the params
 	private static final int MIN_ITER_TO_TRACK = 0;
 	
-	static Map<String, Integer> verbToId;
-	static Map<String, Integer> nounToId;
-	static Map<Pair<Integer, Integer>, Integer> vnCount;
-	static String[] idToVerb;
-	static String[] idToNoun;
-	
 	// Using the notations from Figure 6 of http://arxiv.org/pdf/1206.7051v3.pdf
 	public static void main(String[] args) throws Exception {
 		String trainFile = args[0];
@@ -42,8 +34,14 @@ public class LargeScaleStochasticVariationalInference {
 			outDir += "/";
 		}
 		
-		ingestData(trainFile);
-		writeModelMapping(outDir);
+		LDACorpus corpus = ingestData(trainFile);
+		writeModelMapping(outDir, corpus);
+		
+		Map<String, Integer> verbToId = corpus.verbToId;
+		Map<String, Integer> nounToId = corpus.nounToId;
+		Map<Pair<Integer, Integer>, Integer> vnCount = corpus.vnCount;
+		String[] idToVerb = corpus.idToVerb;
+		String[] idToNoun = corpus.idToNoun;
 		
 		// compressedDataset[i] contains samples for document (verb) i
 		// each sample is a <nounId, frequency> pair
@@ -354,12 +352,17 @@ public class LargeScaleStochasticVariationalInference {
 	
 	////////////////////////////////////
 	// Initialize all the vn's id mappings 
-	private static void ingestData(String trainFile) throws Exception {
+	public static LDACorpus ingestData(String trainFile) throws Exception {
+		LDACorpus corpus = new LDACorpus();
 		System.out.println("Ingesting data...");
-		verbToId = new HashMap<String, Integer>();
-		nounToId = new HashMap<String, Integer>();
+		corpus.verbToId = new HashMap<String, Integer>();
+		corpus.nounToId = new HashMap<String, Integer>();
 		// count of (v,n) in the corpus
-		vnCount = new HashMap<Pair<Integer, Integer>, Integer>();
+		corpus.vnCount = new HashMap<Pair<Integer, Integer>, Integer>();
+		
+		Map<String, Integer> verbToId = corpus.verbToId;
+		Map<String, Integer> nounToId = corpus.nounToId;
+		Map<Pair<Integer, Integer>, Integer> vnCount = corpus.vnCount;
 		
 		BufferedReader br = new BufferedReader(new FileReader(trainFile));
 		String line = br.readLine();
@@ -394,8 +397,10 @@ public class LargeScaleStochasticVariationalInference {
 		}
 		br.close();
 		
-		idToVerb = new String[verbToId.size()];
-		idToNoun = new String[nounToId.size()];
+		corpus.idToVerb = new String[verbToId.size()];
+		corpus.idToNoun = new String[nounToId.size()];
+		String[] idToVerb = corpus.idToVerb;
+		String[] idToNoun = corpus.idToNoun;
 		for(Entry<String, Integer> entry : verbToId.entrySet()) {
 			idToVerb[entry.getValue()] = entry.getKey();
 		}
@@ -408,28 +413,38 @@ public class LargeScaleStochasticVariationalInference {
 		System.out.println("Verbs = " + Arrays.toString(idToVerb));
 		System.out.println("Nouns = " + Arrays.toString(idToNoun));
 		System.out.println("Finished ingesting data");
+		
+		return corpus;
 	}
 	
 	/**
 	 * Write the mappings of verb and noun ids 
 	 * @throws FileNotFoundException 
 	 */
-	private static void writeModelMapping(String outDir) throws FileNotFoundException {
+	public static void writeModelMapping(String outDir, LDACorpus corpus) throws FileNotFoundException {
 		System.out.println("Writing model mapping");
 		PrintWriter verbWriter = new PrintWriter(outDir + "verbIdx.txt");
 		PrintWriter nounWriter = new PrintWriter(outDir + "nounIdx.txt");
 		
-		for(int i = 0; i < idToVerb.length; i++) {
-			verbWriter.println(idToVerb[i]);
+		for(int i = 0; i < corpus.idToVerb.length; i++) {
+			verbWriter.println(corpus.idToVerb[i]);
 		}
 		
-		for(int i = 0; i < idToNoun.length; i++) {
-			nounWriter.println(idToNoun[i]);
+		for(int i = 0; i < corpus.idToNoun.length; i++) {
+			nounWriter.println(corpus.idToNoun[i]);
 		}
 		
 		verbWriter.close();
 		nounWriter.close();
 		System.out.println("Finished writing model mapping");
+	}
+	
+	public static class LDACorpus {
+		public Map<String, Integer> verbToId;
+		public Map<String, Integer> nounToId;
+		public Map<Pair<Integer, Integer>, Integer> vnCount;
+		public String[] idToVerb;
+		public String[] idToNoun;
 	}
 }
 
