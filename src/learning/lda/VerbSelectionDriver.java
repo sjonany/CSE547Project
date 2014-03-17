@@ -26,6 +26,7 @@ public class VerbSelectionDriver {
 			line = in.readLine();
 		}
 		in.close();
+		System.out.println(relevantVerbIds);
 		
 		LDAModel model = LDAModel.loadModel(modelDir);
 		
@@ -44,7 +45,6 @@ public class VerbSelectionDriver {
 			verbIdToBestTopicId[verbId] = bestTopic;
 			maxProbs[verbId] = maxProb;
 		}
-		
 		for(int verbId : relevantVerbIds) {
 			System.out.println("Verb = " + model.getVerb(verbId));
 			System.out.println("Best topic = " + verbIdToBestTopicId[verbId] +"\n");

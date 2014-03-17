@@ -13,12 +13,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.math3.distribution.ExponentialDistribution;
+import org.apache.commons.math3.distribution.GammaDistribution;
+
+import util.StatUtil;
 
 public class StochasticVariationalInference {
 	
 	// how many iterations til i start keeping a log of the params
-	private static final int MIN_ITER_TO_TRACK = 100;
+	private static final int MIN_ITER_TO_TRACK = 0;
 
 	// Using the notations from Figure 6 of http://arxiv.org/pdf/1206.7051v3.pdf
 	public static void main(String[] args) throws Exception {
@@ -83,7 +85,7 @@ public class StochasticVariationalInference {
 			line = vnReader.readLine();
 		}
 		
-		System.out.println("There are a total of " + numDistinctVerbs + " distinct verbs in the dataset.");
+		System.out.println("There are a total of " + numDistinctVerbs + " distinct verbs in the dataset. = " + textIdToCompactId.keySet());
 		int[] compactIdToTextId = new int[numDistinctVerbs];
 		for(Entry<Integer, Integer> entry : textIdToCompactId.entrySet()) {
 			compactIdToTextId[entry.getValue()] = entry.getKey();
@@ -123,10 +125,10 @@ public class StochasticVariationalInference {
 		final int NUM_TOPIC = 300;
 		// page 35
 		final double ALPHA = 1.0 / NUM_TOPIC;
-		final double ETA = 0.01;
+		final double ETA = 1.0 / NUM_TOPIC;
 		
 		final int D = numDistinctVerbs;
-		final int NUM_ROUNDS = 100;
+		final int NUM_ROUNDS = 1000;
 		
 		final double PHI_CONVERGENCE = 0.01;
 		final double GAMMA_CONVERGENCE = 0.001;
@@ -134,14 +136,20 @@ public class StochasticVariationalInference {
 		//lambda is param for distribution of objects/noun | topic
 		double[][] lambda = new double[NUM_TOPIC][N];
 		
-		// footnote of pg 26 of the svi paper
+		
 		int maxNounPerVerb = 0;
+		int totSamples = 0;
 		for(List<Integer> samples : dataset) {
 			maxNounPerVerb = Math.max(maxNounPerVerb, samples.size());
+			totSamples += samples.size();
 		}
-		
-		ExponentialDistribution lambdaSampler = new ExponentialDistribution(
-				1.0 * numDistinctVerbs * maxNounPerVerb / NUM_TOPIC / N);
+		System.out.println("Total samples = " + totSamples);
+
+		// footnote of pg 26 of the svi paper
+		double expParam = 3.0;//(1.0 * numDistinctVerbs * maxNounPerVerb / NUM_TOPIC / N);
+		double expMean = 1.0 / expParam;
+		System.out.println("exp param = " + expParam);
+		GammaDistribution lambdaSampler = new GammaDistribution(100.0, 0.01);
 		
 		//Initialize lambda(t=0) randomly
 		for(int k = 0; k < NUM_TOPIC; k++) {
@@ -166,7 +174,7 @@ public class StochasticVariationalInference {
 		// for now, just round robin
 		for(int iter = 0; iter < NUM_ROUNDS * numDistinctVerbs; iter++) {
 			// page 1320 of http://jmlr.org/papers/volume14/hoffman13a/hoffman13a.pdf
-			double stepSize = Math.pow((iter + 1), -0.9);
+			double stepSize = Math.pow((iter + 2), -0.5);
 			
 			System.out.println("Starting sample " + iter);
 			// Get a document id from the dataset
@@ -174,8 +182,9 @@ public class StochasticVariationalInference {
 			int d = compactVerbId;
 			
 			// init gamma
+			// the paper says set to 1, but the code i found online sampled from gamma dist
 			for(int k = 0; k < NUM_TOPIC; k++) {
-				gamma[d][k] = 1;
+				gamma[d][k] = lambdaSampler.sample();
 			}
 			
 			// precompute digamma of lambdas
@@ -221,6 +230,7 @@ public class StochasticVariationalInference {
 						double E_log_theta = digamma_gamma[k] - sum_digamma;
 						double E_log_beta = digamma_lambda[k][n] - sum_digamma_lambda[k];
 						pows[k] = E_log_theta + E_log_beta;
+						// System.out.println("Stub");
 					}
 					
 					//System.out.println("Pows max = " + maxArr(pows) + " , min = " + minArr(pows));
@@ -234,6 +244,7 @@ public class StochasticVariationalInference {
 					// update gamma_d
 					for(int k = 0; k < NUM_TOPIC; k++) {
 						double phi_i_k = Math.exp(pows[k] - logSum);
+						//System.out.println(k + " -> " + phi_i_k);
 						tempGammaD[k] += phi_i_k;
 						
 						// Assume that this is the converging iteration
@@ -269,6 +280,8 @@ public class StochasticVariationalInference {
 					}
 				}
 				
+				//System.out.println("tempGammaD = " + compress(tempGammaD));
+				
 				for(int i = 0; i < tempGammaD.length; i++) {
 					gamma[d][i] = tempGammaD[i];
 				}
@@ -300,7 +313,23 @@ public class StochasticVariationalInference {
 			// We have the free variables, but want to recover the parameters
 			// We just get the mode -- beta ~ Dir(alpha), just get the beta that maxes this prob
 			
-			if(iter > MIN_ITER_TO_TRACK && (iter % 20 == 0 || iter % 20 == 1)) {
+			System.out.println("Gammas:");
+			for(int v = 0; v < numDistinctVerbs; v++) {
+				System.out.print(v + " - " + compactIdToTextId[v] + ": ");
+				System.out.println(compress(gamma[v]));
+		    for (int t = 0; t < NUM_TOPIC; t++) {
+		    	 System.out.print(gamma[v][t]);
+		       if (t < NUM_TOPIC-1) {
+		      	 System.out.print("\t");
+		       } else {
+		      	 System.out.println();
+		       }
+		    }
+			}
+			System.out.flush();
+			
+			// logging
+			if(iter > MIN_ITER_TO_TRACK && (iter % 10 == 0 || iter % 10 == 1)) {	
 				PrintWriter printWriter = new PrintWriter(baseDir + "betaAtIter" + iter + ".txt");
 			
 		    for (int t = 0; t < NUM_TOPIC; t++) {
@@ -335,9 +364,39 @@ public class StochasticVariationalInference {
 		        }
 		      }
 		    }
-		    
 		    printWriter.close();
-			}
+
+				printWriter = new PrintWriter(baseDir + "lambdaAtIter" + iter + ".txt");
+			
+		    for (int t = 0; t < NUM_TOPIC; t++) {
+		      for (int n = 0; n < N; n++) {
+		        printWriter.print(lambda[t][n]);
+		        if (n < N-1) {
+		        	printWriter.print("\t");
+		        } else {
+		        	printWriter.println();
+		        }
+		      }
+		    }
+		    	    
+		    printWriter.close();
+		    
+				printWriter = new PrintWriter(baseDir + "gammaAtIter" + iter + ".txt");
+			
+				for(int v = 0; v < numDistinctVerbs; v++) {
+					printWriter.print(compactIdToTextId[v] + ": ");
+			    for (int t = 0; t < NUM_TOPIC; t++) {
+			       printWriter.print(gamma[v][t]);
+			       if (t < NUM_TOPIC-1) {
+			       	printWriter.print("\t");
+			       } else {
+			       	printWriter.println();
+			       }
+			    }
+				}
+		    	    
+		    printWriter.close();
+			} // end logging
 		} // for each data point = document    
 	}//end main
 	
@@ -367,22 +426,16 @@ public class StochasticVariationalInference {
 		return sum;
 	}
 	
-	// Non-recursive digamma stolen from https://code.google.com/p/xieboyi/source/browse/trunk/Ilda/src/org/knowceans/util/Gamma.java?r=247
-	// Written by Gregor Heinrich
-	public static double digamma0(double x) {
-		//double input = x;
-		
-    double p;
-    assert x > 0 : "digamma(" + x + ")";
-    x = x + 6;
-    p = 1 / (x * x);
-    p = (((0.004166666666667 * p - 0.003968253986254) * p + 0.008333333333333)
-                    * p - 0.083333333333333)
-                    * p;
-    p = p + Math.log(x) - 0.5 / x - 1 / (x - 1) - 1 / (x - 2) - 1 / (x - 3) - 1
-                    / (x - 4) - 1 / (x - 5) - 1 / (x - 6);
-    //System.out.println("Digamma of " + input + " = " + p);
-    return p;
+	// Non-recursive digamma from http://www.cs.princeton.edu/~blei/topicmodeling.html
+	// lda-c-dist/utils.c
+	static double digamma0(double x)
+	{
+	    double p;
+	    x=x+6;
+	    p=1/(x*x);
+	    p=(((0.004166666666667*p-0.003968253986254)*p+ 0.008333333333333)*p-0.083333333333333)*p;
+	    p=p+Math.log(x)-0.5/x-1/(x-1)-1/(x-2)-1/(x-3)-1/(x-4)-1/(x-5)-1/(x-6);
+	    return p;
 	}
 	
 	// approx log {sum e^ki}
@@ -441,5 +494,14 @@ public class StochasticVariationalInference {
 			Arrays.fill(arr, 0);
 		}
 	}
+	
+	public static Map<Double, Integer> compress(double[] arr) {
+		Map<Double, Integer> res = new HashMap<Double, Integer>();
+		for(double x : arr) {
+			StatUtil.addToTally(res, x, 1);
+		}
+		return res;
+	}
+	
 }
 

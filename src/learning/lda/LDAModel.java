@@ -124,7 +124,7 @@ public class LDAModel {
 		model.nounDistPerTopic = new double[topicCount][nounCount];
 		nounDistPerTopicReader = new BufferedReader(new FileReader(pathToBetas));
 		line = nounDistPerTopicReader.readLine();
-		int row = 0;
+		int row = 0;	
 		while(line != null) {
 			String[] toks = line.split("\t");
 			for(int col = 0; col < nounCount; col++) {
